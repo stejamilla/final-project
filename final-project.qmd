@@ -1,0 +1,44 @@
+---
+title: "Final Project"
+subtitle: "Data Science for Public Policy"
+author: "Madeleine Adelson, Stephanie Jamilla, Jamie Jelly Murtha"
+format: 
+  html:
+    code-line-numbers: true
+    body-width: 1600px
+embed-resources: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  warning: false
+urlcolor: blue
+toc: true
+---
+
+Loading packages:
+```{r}
+
+library(tidyverse)
+library(ggplot2)
+library(sf)
+library(tidycensus)
+library(stringr)
+library(dplyr)
+
+```
+
+Data cleaning:
+```{r}
+
+# Heat Data - cleaning up columns
+dc_heat <- read_sf("data/2024UHI_DC.kml") |>
+  mutate(uhi = str_split_fixed(Name, "- ", 2)) |> 
+  mutate(uhi = str_split_fixed(uhi[,2], "°", 2)) 
+# column uhi[, 1] should now have the right urban heat index but I can't figure it out right now
+
+# Demographic Data - viewing possible values for 2016-2020 ACS
+variables <- load_variables(2020, "acs5") |>
+  filter(geography == "block group")
+
+```
+
