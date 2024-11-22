@@ -1,0 +1,547 @@
+<?xml version="1.0" encoding="UTF-8"?><metadata>
+    <idinfo>
+        <citation>
+            <citeinfo>
+                <origin/>
+                <pubdate>20220405</pubdate>
+                <title>Urban Tree Canopy by Census Block Group in 2020</title>
+                <geoform>vector digital data</geoform>
+            </citeinfo>
+        </citation>
+        <descript>
+            <abstract>These data represent Census Block Groups 2020 in Washington, DC. Urban tree canopy (UTC) and possible planting area (PPA) metrics have been calculated for Census Block Groups 2020 within the study area. UTC results provided in vector format with attribute fields (area/percent metrics/percent change metrics) for each land cover class and UTC type (UTC, PPA, Unsuitable UTC, UTC Change).</abstract>
+            <purpose>To assess urban tree canopy in Washington, DC and to maintain planning activities.</purpose>
+        </descript>
+        <status>
+            <progress>Complete</progress>
+            <update>Irregular</update>
+        </status>
+        <spdom>
+            <bounding>
+                <westbc>-77.119896</westbc>
+                <eastbc>-76.909016</eastbc>
+                <northbc>38.995967</northbc>
+                <southbc>38.791582</southbc>
+            </bounding>
+        </spdom>
+        <keywords>
+            <theme>
+                <themekt>ISO 19115 Topic Categories</themekt>
+                <themekey>environment</themekey>
+                <themekey>urban forestry</themekey>
+            </theme>
+            <place>
+                <placekt>None</placekt>
+                <placekey>washington dc</placekey>
+                <placekey>district of columbia</placekey>
+                <placekey>dc</placekey>
+            </place>
+        </keywords>
+        <accconst>Other Constraints</accconst>
+        <useconst>The suitability of this dataset for any other uses beyond those specified in the Purpose section of this document is not guaranteed, and the user assumes all risk for such uses. DDOT UFD assumes no legal responsibility for works derived from this dataset.</useconst>
+        <ptcontac>
+            <cntinfo>
+                <cntorgp>
+                    <cntorg>District Department of Transportation</cntorg>
+                </cntorgp>
+                <cntpos>Urban Forestry Division</cntpos>
+                <cntaddr>
+                    <addrtype>mailing and physical</addrtype>
+                    <address>250 M Street SE</address>
+                    <city>Washington</city>
+                    <state>DC</state>
+                    <postal>20003</postal>
+                    <country>US</country>
+                </cntaddr>
+                <cntvoice>(202) 673-6813</cntvoice>
+                <cntemail>ufaddot@dc.gov</cntemail>
+            </cntinfo>
+        </ptcontac>
+        <ptcontac>
+            <cntinfo>
+                <cntorgp>
+                    <cntorg>Office of the Chief Technology Officer</cntorg>
+                </cntorgp>
+                <cntpos>GIS Data Coordinator</cntpos>
+                <cntaddr>
+                    <addrtype>mailing and physical</addrtype>
+                    <address>200 I Street SE</address>
+                    <city>Washington</city>
+                    <state>DC</state>
+                    <postal>20003</postal>
+                    <country>US</country>
+                </cntaddr>
+                <cntvoice>(202) 727-2277</cntvoice>
+                <cntemail>dcgis@dc.gov</cntemail>
+                <hours>8:30 am - 5 pm</hours>
+            </cntinfo>
+        </ptcontac>
+        <datacred>District Department of Transportation</datacred>
+        <native>Version 6.2 (Build 9200) ; Esri ArcGIS 10.8.1.14362</native>
+    </idinfo>
+    <spdoinfo>
+        <direct>Vector</direct>
+        <ptvctinf>
+            <sdtsterm>
+                <sdtstype>GT-polygon composed of chains</sdtstype>
+                <ptvctcnt>571</ptvctcnt>
+            </sdtsterm>
+        </ptvctinf>
+    </spdoinfo>
+    <eainfo>
+        <detailed>
+            <enttyp>
+                <enttypl>Urban Tree Canopy by Census Block Group in 2020</enttypl>
+                <enttypd>Urban Tree Canopy by Census Block Group in 2020</enttypd>
+                <enttypds>UFD</enttypds>
+            </enttyp>
+            <attr>
+                <attrlabl>OBJECTID</attrlabl>
+                <attrdef>Internal feature number.</attrdef>
+                <attrdefs>Esri</attrdefs>
+                <attrdomv>
+                                        					
+                    
+                    <udom>Sequential unique whole numbers that are automatically generated.</udom>
+                                        				
+                
+                </attrdomv>
+            </attr>
+            <attr>
+                <attrlabl>Shape</attrlabl>
+                <attrdef>Feature geometry.</attrdef>
+                <attrdefs>Esri</attrdefs>
+                <attrdomv>
+                                        					
+                    
+                    <udom>Coordinates defining the features.</udom>
+                                        				
+                
+                </attrdomv>
+            </attr>
+            <attr>
+                <attrlabl>STATEFP</attrlabl>
+                <attrdef>State (FIPS)</attrdef>
+                <attrdefs>Census</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>COUNTYFP</attrlabl>
+                <attrdef>County (FIPS)</attrdef>
+                <attrdefs>Census</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>TRACTCE</attrlabl>
+                <attrdef>Tract Number</attrdef>
+                <attrdefs>Census</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>BLKGRPCE</attrlabl>
+                <attrdef>Block Group</attrdef>
+                <attrdefs>Census</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>GEOID</attrlabl>
+            </attr>
+            <attr>
+                <attrlabl>NAMELSAD</attrlabl>
+                <attrdef>Area Name-Legal/Statistical Area Description (LSAD) Term-Part Indicator</attrdef>
+                <attrdefs>Census</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>MTFCC</attrlabl>
+            </attr>
+            <attr>
+                <attrlabl>FUNCSTAT</attrlabl>
+            </attr>
+            <attr>
+                <attrlabl>ALAND</attrlabl>
+                <attrdef>Area Land</attrdef>
+                <attrdefs>Census</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>AWATER</attrlabl>
+                <attrdef>Area Water</attrdef>
+                <attrdefs>Census</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>INTPTLAT</attrlabl>
+            </attr>
+            <attr>
+                <attrlabl>INTPTLON</attrlabl>
+            </attr>
+            <attr>
+                <attrlabl>TOTAL_AC</attrlabl>
+                <attrdef>Total area, in acres, of the assessment boundary.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>LAND_AC</attrlabl>
+                <attrdef>Total land area, in acres, in the assessment boundary. Land area excludes surface water bodies.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>TCAN_AC</attrlabl>
+                <attrdef>The area, in acres, of existing urban tree canopy (UTC) within the assessment boundary.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>TCAN_PCT</attrlabl>
+                <attrdef>The percent of total area (including water) in the assessment boundary that is covered by urban tree canopy (UTC).</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>VEG_AC</attrlabl>
+                <attrdef>The area, in acres, of non-canopy vegetation within the assessment boundary. This includes all grass and open space which may or may not be suitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>VEG_PCT</attrlabl>
+                <attrdef>The percent of total area (including water) in the assessment boundary that is covered by non-canopy vegetation. This includes all grass and open space which may or may not be suitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>BLD_AC</attrlabl>
+                <attrdef>The area, in acres, of buildings within the assessment boundary. Areas covered by buildings are considered unsuitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>BLD_PCT</attrlabl>
+                <attrdef>The percent of total area in the assessment boundary that is covered by buildings. Areas covered by buildings are considered unsuitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>ROAD_AC</attrlabl>
+                <attrdef>The area, in acres, of road surfaces within the assessment boundary. Areas covered by road surfaces are considered unsuitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>ROAD_PCT</attrlabl>
+                <attrdef>The percent of total area (including water) in the assessment boundary that is covered by roads. Areas covered by road surfaces are considered unsuitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>PLOT_AC</attrlabl>
+                <attrdef>The area, in acres, of parking lots within the assessment boundary. Areas covered by parking lots are considered suitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>PLOT_PCT</attrlabl>
+                <attrdef>The percent of total area in the assessment boundary that is covered by parking lots. Areas covered by parking lots are considered suitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>SWALK_AC</attrlabl>
+                <attrdef>The area, in acres, of sidewalks within the assessment boundary. Areas covered by sidewalks are considered suitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>SWALK_PCT</attrlabl>
+                <attrdef>The percent of total area in the assessment boundary that is covered by sidewalks. Areas covered by sidewalks are considered suitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>OT_IA_AC</attrlabl>
+                <attrdef>The area, in acres, of any other impervious surface within the assessment boundary. Other non-building, non-road impervious surfaces offer space where it may be feasible to plant trees.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>OT_IA_PCT</attrlabl>
+                <attrdef>The percent of total area (including water) in the assessment boundary that is covered by other impervious surfaces such as buildings and roads where it is not feasible to plant trees.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>TO_IA_AC</attrlabl>
+                <attrdef>The area, in acres, of all combined impervious surfaces within the assessment boundary. This includes all impervious surfaces which may or may not be suitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>TO_IA_PCT</attrlabl>
+                <attrdef>The percent of total area (including water) in the assessment boundary that is covered by all combined impervious surfaces. This includes all impervious surfaces which may or may not be suitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>SOIL_AC</attrlabl>
+                <attrdef>The area, in acres, of barren soil and dry vegetation within the assessment boundary. Areas of barren soil and dry vegetation are considered unsuitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>SOIL_PCT</attrlabl>
+                <attrdef>The percent of total area (including water) in the assessment boundary that is covered by barren soil and dry vegetation. Areas of barren soil and dry vegetation are considered unsuitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>WAT_AC</attrlabl>
+                <attrdef>The area, in acres, of surface water within the assessment boundary.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>WAT_PCT</attrlabl>
+                <attrdef>The percent of total area in the assessment boundary that is covered by surface water.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UTC_AC</attrlabl>
+                <attrdef>The area, in acres, of existing urban tree canopy within the assessment boundary.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UTC_PCT</attrlabl>
+                <attrdef>The percent of land area in the assessment boundary that is covered by urban tree canopy.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>PPA_V_AC</attrlabl>
+                <attrdef>The area, in acres, of possible planting area that is vegetated within the assessment boundary. Possible planting area vegetation is defined as non-canopy vegetated areas where it is biophysically feasible to plant trees.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>PPA_V_PCT</attrlabl>
+                <attrdef>The percentage of land area in the assessment boundary that is covered by possible planting area vegetation. Possible planting area vegetation is defined as non-canopy vegetated areas where it is biophysically feasible to plant trees.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>PPA_IA_AC</attrlabl>
+                <attrdef>The area, in acres, of possible planting area that is impervious within the assessment boundary. Possible planting area impervious is defined as an impervious area where it is biophysically feasible to plant trees.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>PPA_IA_PCT</attrlabl>
+                <attrdef>The percentage of land area in the assessment boundary that is covered by possible planting area that is impervious within the assessment boundary. Possible planting area impervious is defined as an impervious area where it is biophysically feasible to plant trees.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>TO_PPA_AC</attrlabl>
+                <attrdef>The area, in acres, of all possible planting area within the assessment boundary. This includes PPA Vegetation, PPA Impervious, and any other specified PPA types.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>TO_PPA_PCT</attrlabl>
+                <attrdef>The percentage of land area in the assessment boundary that is covered by all possible planting area. This includes PPA Vegetation, PPA Impervious, and any other specified PPA types.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UN_V_AC</attrlabl>
+                <attrdef>The area, in acres, of land covered by vegetation within the assessment boundary which is also considered unsuitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UN_V_PCT</attrlabl>
+                <attrdef>The percentage of land area in the assessment boundary covered by vegetation which is also considered unsuitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UN_IA_AC</attrlabl>
+                <attrdef>The area, in acres, of land covered by buildings, roads, and other impervious surfaces within the assessment boundary which are considered unsuitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UN_IA_PCT</attrlabl>
+                <attrdef>The percentage of land area in the assessment boundary covered by buildings, roads, and other impervious surfaces which are considered unsuitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UN_SL_AC</attrlabl>
+                <attrdef>The area, in acres, of land in the assessment boundary covered by barren soil and dry vegetation. Areas of barren soil and dry vegetation are considered unsuitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UN_SL_PCT</attrlabl>
+                <attrdef>The percentage of land area in the assessment boundary covered by barren soil and dry vegetation. Areas of barren soil and dry vegetation are considered unsuitable for planting.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>TO_UN_AC</attrlabl>
+                <attrdef>The area, in acres, of all land in the assessment boundary that is considered unsuitable for planting. This includes buildings and roads, barren soil and dry vegetation, as well as sports fields, golf course playing areas, airports, agricultural land, wetlands and any other land identified as unsuitable.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>TO_UN_PCT</attrlabl>
+                <attrdef>The percentage of land area in the assessment boundary that is considered unsuitable for planting. This includes buildings and roads, barren soil and dry vegetation, as well as sports fields, golf course playing areas, airports, agricultural land, wetlands and any other land identified as unsuitable.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>WTR_AC</attrlabl>
+                <attrdef>The area, in acres, of surface water within the assessment boundary.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>WTR_PCT</attrlabl>
+                <attrdef>The percent of total area in the assessment boundary that is covered by surface water.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>GID</attrlabl>
+                <attrdef>A unique identifying code created for processing purposes.</attrdef>
+            </attr>
+            <attr>
+                <attrlabl>UTC_AC_06</attrlabl>
+                <attrdef>The area, in acres, of urban tree canopy within the assessment boundary from a previous assessment (2006).</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UTC_PCT_06</attrlabl>
+                <attrdef>The percent of land area in the assessment boundary that was covered by urban tree canopy in 2006.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UTCAC0620</attrlabl>
+                <attrdef>The difference in area (acres) of urban tree canopy from 2006 to 2020.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UTCPCT0620</attrlabl>
+                <attrdef>The difference in percentage of land area covered by urban tree canopy from 2006 to 2020.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UTC_AC_11</attrlabl>
+                <attrdef>The area, in acres, of urban tree canopy within the assessment boundary from a previous assessment (2011).</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UTC_PCT_11</attrlabl>
+                <attrdef>The percent of land area in the assessment boundary that was covered by urban tree canopy in 2011.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UTCAC1120</attrlabl>
+                <attrdef>The difference in area (acres) of urban tree canopy from 2011 to 2020.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UTCPCT1120</attrlabl>
+                <attrdef>The difference in percentage of land area covered by urban tree canopy from 2011 to 2020.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UTC_AC_15</attrlabl>
+                <attrdef>The area, in acres, of urban tree canopy within the assessment boundary from a previous assessment (2015).</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UTC_PCT_15</attrlabl>
+                <attrdef>The percent of land area in the assessment boundary that was covered by urban tree canopy in 2015.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UTCAC1520</attrlabl>
+                <attrdef>The difference in area (acres) of urban tree canopy from 2015 to 2020.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UTCPCT1520</attrlabl>
+                <attrdef>The difference in percentage of land area covered by urban tree canopy from 2015 to 2020.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>ENRGY_CON</attrlabl>
+                <attrdef>This indicator identifies residentially zoned areas with less than the district average tree cover and higher than average total possible planting area.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>STRM_WTR</attrlabl>
+                <attrdef>This indicator uses available planting area on and adjacent to impervious surfaces and surface water bodies to indicate areas where trees will more directly benefit stormwater runoff mitigation.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>UHI</attrlabl>
+                <attrdef>The average temperature value within each feature. Evening temperature values from a 2018 Portland State University study were used</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>LAND_OWN</attrlabl>
+                <attrdef>Possible planting area on District owned operated or managed public &amp; public/private land. Values are the percentage of plantable space within public land.</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>WLDLF_CON</attrlabl>
+                <attrdef>This indicator identifies available planting areas within 100’ of large canopy tracts (equal to or greater than 5 acres).</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>OVERALL</attrlabl>
+                <attrdef>The overall suitability for tree planting score based on a weighted formula that includes all planting prioritization categories</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>LOW_UTC</attrlabl>
+                <attrdef>Low UTC</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>GIS_ID</attrlabl>
+            </attr>
+            <attr>
+                <attrlabl>POS_UTC</attrlabl>
+                <attrdef>Positive UTC</attrdef>
+                <attrdefs>UFD</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>GLOBALID</attrlabl>
+            </attr>
+            <attr>
+                <attrlabl>SE_ANNO_CAD_DATA</attrlabl>
+            </attr>
+            <attr>
+                <attrlabl>SHAPE.AREA</attrlabl>
+            </attr>
+            <attr>
+                <attrlabl>SHAPE.LEN</attrlabl>
+            </attr>
+        </detailed>
+    </eainfo>
+    <distinfo>
+        <distrib>
+            <cntinfo>
+                <cntorgp>
+                    <cntorg>Office of the Chief Technology Officer</cntorg>
+                </cntorgp>
+                <cntpos>GIS Data Coordinator</cntpos>
+                <cntaddr>
+                    <addrtype>mailing and physical</addrtype>
+                    <address>200 I Street SE</address>
+                    <city>Washington</city>
+                    <state>DC</state>
+                    <postal>20003</postal>
+                    <country>US</country>
+                </cntaddr>
+                <cntvoice>(202) 727-2277</cntvoice>
+                <cntemail>dcgis@dc.gov</cntemail>
+                <hours>8:30 am - 5 pm</hours>
+            </cntinfo>
+        </distrib>
+        <distliab>The suitability of this dataset for any other uses beyond those specified in the Purpose section of this document is not guaranteed, and the user assumes all risk for such uses. DDOT UFD assumes no legal responsibility for works derived from this dataset.</distliab>
+        <stdorder>
+            <digform>
+                <digtinfo>
+                    <formname>Feature Class</formname>
+                </digtinfo>
+            </digform>
+        </stdorder>
+    </distinfo>
+    <metainfo>
+        <metd>20231004</metd>
+        <metc>
+            <cntinfo>
+                <cntorgp>
+                    <cntorg>Office of the Chief Technology Officer</cntorg>
+                </cntorgp>
+                <cntpos>GIS Data Coordinator</cntpos>
+                <cntaddr>
+                    <addrtype>mailing and physical</addrtype>
+                    <address>200 I Street SE</address>
+                    <city>Washington</city>
+                    <state>DC</state>
+                    <postal>20003</postal>
+                    <country>US</country>
+                </cntaddr>
+                <cntvoice>(202) 727-2277</cntvoice>
+                <cntemail>dcgis@dc.gov</cntemail>
+                <hours>8:30 am - 5 pm</hours>
+            </cntinfo>
+        </metc>
+        <metstdn>FGDC Content Standard for Digital Geospatial Metadata</metstdn>
+        <metstdv>FGDC-STD-001-1998</metstdv>
+        <mettc>local time</mettc>
+    </metainfo>
+</metadata>
