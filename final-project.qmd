@@ -42,6 +42,7 @@ dc_heat <- read_sf("data/2024UHI_DC.kml") |>
 # Changing the UHI variable from character to numeric
 dc_heat$uhi <- as.numeric(dc_heat$uhi)
 ```
+I read more about (the methodology)[https://www.climatecentral.org/climate-matters/urban-heat-islands-2024] of this dataset and realized that Climate Central basically created the UHI index by analyzing things like land cover types, percentage of greenspace, albedo, population density, etc to create this dataset. So in a way, this project is almost seeing if we can replicate their model - which they used for 65 cities, specifically for DC. I think we can frame this as using DC-specific data and seeing if there are important factors Climate Central overlooked or if we think their model is valid. -Stephanie
 
 ## Cleaning DC Land Cover Data
 ```{r}
@@ -52,6 +53,7 @@ names(landcover) <- names(landcover) |>
   tolower()
 
 ```
+Notably, this dataset also has a UHI variable; its definition is "The average temperature value within each feature. Evening temperature values from a 2018 Portland State University study were used." Since this is average temperature, I don't think this really counts as an urban heat index/what we're really trying to analyze here. -Stephanie
 
 ## Exploring Census Demographic Data
 
@@ -61,6 +63,15 @@ variables <- load_variables(2020, "acs5") |>
   filter(geography == "block group")
 
 ```
+I (Stephanie) think we could use some or all of the following ACS data:
+* B01003_001 - Total population
+* B02001_002 through B02001_010 - Population for different racial groups
+* B15003_002 through B15003_025 - Educational attainment of those 25 and over
+* B19001_002 through B19001_017 - Household income in the past 12 months
+* B25001_001 - Total # of housing units
+* B25002_002 & B25002_003 - Total # of occupied or vacant units
+* B25075_002 through B25075_027 - Total value of housing units
+
 
 ## Stitching Together Final Dataset
 ```{r}
