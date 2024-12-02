@@ -27,7 +27,9 @@ library(dplyr)
 
 ```
 
-Data cleaning:
+# Exploring the Data
+
+Cleaning Urban Heat Data:
 ```{r}
 
 # Heat Data - cleaning up columns
@@ -37,9 +39,32 @@ dc_heat <- read_sf("data/2024UHI_DC.kml") |>
   separate(temp, c("temp", "block_group", "x"), ": ") |>
   select(-city, -temp, -x, -Description)
 
-# Demographic Data - viewing possible values for 2016-2020 ACS
+# Changing the UHI variable from character to numeric
+dc_heat$uhi <- as.numeric(dc_heat$uhi)
+```
+
+Exploring and deciding on demographic data via Census:
+```{r}
+# Loading possible variables to use for 2016-2020 ACS
 variables <- load_variables(2020, "acs5") |>
   filter(geography == "block group")
 
+
+
 ```
 
+DC heat map:
+```{r}
+
+dc_heat |>
+  ggplot() +
+  geom_sf(mapping = aes(fill = uhi)) +
+  scale_fill_gradient(
+    'Urban Heat Island Index',
+    low = '#FCEBA6',
+    high = '#AF1F29'
+  ) +
+  labs(title = "DC Urban Heat Island Itensity") +
+  theme_minimal() 
+
+```
