@@ -29,7 +29,7 @@ library(dplyr)
 
 # Exploring the Data
 
-Cleaning Urban Heat Data:
+## Cleaning Urban Heat Data
 ```{r}
 
 # Heat Data - cleaning up columns
@@ -43,17 +43,34 @@ dc_heat <- read_sf("data/2024UHI_DC.kml") |>
 dc_heat$uhi <- as.numeric(dc_heat$uhi)
 ```
 
-Exploring and deciding on demographic data via Census:
+## Cleaning DC Land Cover Data
+```{r}
+
+landcover <- read_sf("data/Urban_Tree_Canopy_by_Census_Block_Group_in_2020.shp") |>
+  rename(block_group = GEOID)
+names(landcover) <- names(landcover) |>
+  tolower()
+
+```
+
+## Exploring Census Demographic Data
+
 ```{r}
 # Loading possible variables to use for 2016-2020 ACS
 variables <- load_variables(2020, "acs5") |>
   filter(geography == "block group")
 
+```
+
+## Stitching Together Final Dataset
+```{r}
+
 
 
 ```
 
-DC heat map:
+## Initial EDA
+### DC Heat Map
 ```{r}
 
 dc_heat |>
@@ -64,7 +81,31 @@ dc_heat |>
     low = '#FCEBA6',
     high = '#AF1F29'
   ) +
-  labs(title = "DC Urban Heat Island Itensity") +
+  labs(title = "DC Urban Heat Island Intensity") +
   theme_minimal() 
+
+```
+
+# Supervised Machine Learning Applications
+## Decision Trees
+
+Deciding the threshold for hot vs. not hot:
+```{r}
+
+
+
+```
+
+## Linear Regression
+```{r}
+
+
+
+```
+
+## Random Forests
+```{r}
+
+
 
 ```
