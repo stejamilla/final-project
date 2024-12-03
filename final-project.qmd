@@ -15,6 +15,8 @@ urlcolor: blue
 toc: true
 ---
 
+## Setup
+
 Loading packages:
 ```{r}
 
@@ -27,6 +29,11 @@ library(jsonlite)
 library(httr)
 library(tidymodels)
 
+# Clone the private github repository for this assignment using SSH link:
+# git@github.com:stejamilla/final-project.git
+
+options(scipen = 999)
+
 ```
 
 # Exploring the Data
@@ -34,7 +41,7 @@ library(tidymodels)
 ## Cleaning Urban Heat Data
 ```{r}
 
-# Heat Data - cleaning up columns
+# Read in heat data and clean up columns
 dc_heat <- read_sf("data/2024UHI_DC.kml") |>
   separate(Name, c("city","temp"), "- ") |>
   separate(temp, c("uhi", "temp"), "°") |>
@@ -42,7 +49,7 @@ dc_heat <- read_sf("data/2024UHI_DC.kml") |>
   select(-city, -temp, -x, -Description) |>
   st_set_crs(value = 4326)
 
-# Changing the UHI variable from character to numeric
+# Change the UHI variable from character to numeric
 dc_heat$uhi <- as.numeric(dc_heat$uhi)
 
 ```
@@ -53,19 +60,27 @@ Reminder of Climate Central's definition of UHI: "UHI index values (in °F) are 
 ## Cleaning DC Land Cover Data
 ```{r}
 
-landcover <- read_sf("data/Urban_Tree_Canopy_by_Census_Block_Group_in_2020.shp") |>
+# Read in DC land cover data and clean up
+landcover <- read_sf(paste0("data/Urban_Tree_Canopy",
+                            "_by_Census_Block_Group_in_2020.shp")) |>
   rename(block_group = GEOID) |>
   select(-UHI)
+
+# Clean up names
 names(landcover) <- names(landcover) |>
   tolower()
+
+# Convert block_group to character
 landcover$block_group <- as.character(landcover$block_group)
 
 ```
 Notably, this dataset also has a UHI variable; its definition is "The average temperature value within each feature. Evening temperature values from a 2018 Portland State University study were used." Since this is average temperature, I don't think this really counts as an urban heat index/what we're really trying to analyze here. So I dropped it (so that it wouldn't be confused when we merged with the dc_heat dataset). -Stephanie
 
+
 Selecting only the percentage data:
 ```{r}
 
+# remove irrelevant columns that do not contain percentage data
 landcover <- landcover |>
   select(-contains("_ac"))
 
@@ -75,7 +90,8 @@ I thought percentage of land cover (canopy, impervious surfaces, etc.) is better
 ## Exploring Census Demographic Data
 
 ```{r}
-# Loading possible variables to use for 2016-2020 ACS
+
+# Load ACS 5-yr 2016-2020 data
 variables <- load_variables(2020, "acs5") |>
   filter(geography == "block group")
 
@@ -94,11 +110,11 @@ I'll only load a few below for analysis since we haven't agreed on the variables
 Loading Census variables via API:
 ```{r}
 
-# Loading API key
+# Load Census API key
 credential <- Sys.getenv("census_api_key")
 census_api_key(credential, install = TRUE, overwrite = TRUE)
 
-# Getting the data
+# Pull data via API
 url <- "https://api.census.gov/data/2020/acs/acs5?get=NAME,B01003_001E,B19001_002E,B19001_003E,B19001_004E,B19001_005E,B19001_006E,B19001_007E,B19001_008E,B19001_009E,B19001_010E,B19001_011E,B19001_012E,B19001_013E,B19001_014E,B19001_015E,B19001_016E,B19001_017E&for=block%20group:*&for=tract:*&in=state:11&in=county:001"
 
 acs_json <- GET(url = url)
@@ -109,7 +125,7 @@ acs_data <- as_tibble(acs_matrix[2:nrow(acs_matrix), ],
                       .name_repair = "minimal")
 names(acs_data) <- acs_matrix[1, ]
 
-# Cleaning variable names
+# Clean variable names
 names(acs_data) <- names(acs_data) |>
   str_replace(" ", "_")
 
@@ -133,7 +149,7 @@ acs_data <- acs_data |>
          inc_200000_more = B19001_017E,
          block_group_temp = block_group)
 
-# Creating block_group column to use for combining this with the other datasets
+# Create block_group column to use for combining this with the other datasets
 acs_data$block_group <- paste(acs_data$state, 
                              acs_data$county, 
                              acs_data$tract, 
@@ -159,6 +175,7 @@ dataset_final <- st_join(dc_heat, dataset_interim)
 ### DC Heat Map
 ```{r}
 
+# DC heat map
 dc_heat |>
   ggplot() +
   geom_sf(mapping = aes(fill = uhi)) +
