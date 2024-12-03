@@ -23,7 +23,8 @@ library(ggplot2)
 library(sf)
 library(tidycensus)
 library(stringr)
-library(dplyr)
+library(jsonlite)
+library(httr)
 
 ```
 
@@ -41,8 +42,11 @@ dc_heat <- read_sf("data/2024UHI_DC.kml") |>
 
 # Changing the UHI variable from character to numeric
 dc_heat$uhi <- as.numeric(dc_heat$uhi)
+
 ```
 I read more about (the methodology)[https://www.climatecentral.org/climate-matters/urban-heat-islands-2024] of this dataset and realized that Climate Central basically created the UHI index by analyzing things like land cover types, percentage of greenspace, albedo, population density, etc to create this dataset. So in a way, this project is almost seeing if we can replicate their model - which they used for 65 cities, specifically for DC. I think we can frame this as using DC-specific data and seeing if there are important factors Climate Central overlooked or if we think their model is valid. -Stephanie
+
+Reminder of Climate Central's definition of UHI: "UHI index values (in °F) are estimates of how much the urban built environment boosts temperatures. In other words, the UHI index is an estimate of the additional heat that local land use factors contribute to urban areas."
 
 ## Cleaning DC Land Cover Data
 ```{r}
@@ -72,6 +76,57 @@ I (Stephanie) think we could use some or all of the following ACS data:
 * B25002_002 & B25002_003 - Total # of occupied or vacant units
 * B25075_002 through B25075_027 - Total value of housing units
 
+I'll only load a few below for analysis since we haven't agreed on the variables yet, but I want to be able to play around with some data. -Stephanie
+
+Loading Census variables via API:
+```{r}
+
+# Loading API key
+credential <- Sys.getenv("census_api_key")
+census_api_key(credential, install = TRUE, overwrite = TRUE)
+
+# Getting the data
+url <- "https://api.census.gov/data/2020/acs/acs5?get=NAME,B01003_001E,B19001_002E,B19001_003E,B19001_004E,B19001_005E,B19001_006E,B19001_007E,B19001_008E,B19001_009E,B19001_010E,B19001_011E,B19001_012E,B19001_013E,B19001_014E,B19001_015E,B19001_016E,B19001_017E&for=block%20group:*&for=tract:*&in=state:11&in=county:001"
+
+acs_json <- GET(url = url)
+http_status(acs_json)
+acs_json <- content(acs_json, as = "text")
+acs_matrix <- fromJSON(acs_json)
+acs_data <- as_tibble(acs_matrix[2:nrow(acs_matrix), ],
+                      .name_repair = "minimal")
+names(acs_data) <- acs_matrix[1, ]
+
+names(acs_data) <- names(acs_data) |>
+  str_replace(" ", "_")
+
+acs_data <- acs_data |>
+  rename(total_pop = B01003_001E,
+         nc_less_10000 = B19001_002E,
+         inc_10000_14999 = B19001_003E,
+         inc_15000_19999 = B19001_004E,
+         inc_20000_24999 = B19001_005E,
+         inc_25000_29999 = B19001_006E,
+         inc_30000_34999 = B19001_007E,
+         inc_35000_39999 = B19001_008E,
+         inc_40000_44999 = B19001_009E,
+         inc_45000_49999 = B19001_010E,
+         inc_50000_59999 = B19001_011E,
+         inc_60000_74999 = B19001_012E,
+         inc_75000_99999 = B19001_013E,
+         inc_100000_124999 = B19001_014E,
+         inc_125000_149999 = B19001_015E,
+         inc_150000_199999 = B19001_016E,
+         inc_200000_more = B19001_017E,
+         block_group_temp = block_group)
+
+acs_data$block_group <- paste(acs_data$state, 
+                             acs_data$county, 
+                             acs_data$tract, 
+                             acs_data$block_group_temp,
+                             sep = "")
+
+                             
+```
 
 ## Stitching Together Final Dataset
 ```{r}
@@ -96,11 +151,30 @@ dc_heat |>
   theme_minimal() 
 
 ```
+Notably, every block group in DC boosts temperatures bt 5.7 degrees or more. There's no block group that doesn't have a boost in temperature.
 
 # Supervised Machine Learning Applications
+
 ## Decision Trees
 
 Deciding the threshold for hot vs. not hot:
+```{r}
+
+# visualizing a cumulative histogram of counts of UHI values
+dc_heat |>
+  group_by(uhi) |>
+  ggplot(aes(uhi)) +
+  geom_histogram(aes(y = cumsum(..count..)))
+
+# calculating frequency & cumulative frequency
+heat_freq <- dc_heat |>
+  count(uhi)
+heat_freq$cumulative <- cumsum(heat_freq$n) 
+
+```
+Since there's 571 block groups, that means if we want to decide the heat threshold is where 50% of the data is above/below this line, then we'd want to pick the UHI value where cumulative = 285 or 286. The closest datapoint is UHI = 7.9 (Where cumulative = 268). I vote that we pick UHI <= 7.9 means not a heat island whereas UHI > 7.9 means it is a heat island.
+
+Implementing threshold:
 ```{r}
 
 
