@@ -25,6 +25,7 @@ library(tidycensus)
 library(stringr)
 library(jsonlite)
 library(httr)
+library(tidymodels)
 
 ```
 
@@ -38,7 +39,8 @@ dc_heat <- read_sf("data/2024UHI_DC.kml") |>
   separate(Name, c("city","temp"), "- ") |>
   separate(temp, c("uhi", "temp"), "°") |>
   separate(temp, c("temp", "block_group", "x"), ": ") |>
-  select(-city, -temp, -x, -Description)
+  select(-city, -temp, -x, -Description) |>
+  st_set_crs(value = 4326)
 
 # Changing the UHI variable from character to numeric
 dc_heat$uhi <- as.numeric(dc_heat$uhi)
@@ -52,12 +54,23 @@ Reminder of Climate Central's definition of UHI: "UHI index values (in °F) are 
 ```{r}
 
 landcover <- read_sf("data/Urban_Tree_Canopy_by_Census_Block_Group_in_2020.shp") |>
-  rename(block_group = GEOID)
+  rename(block_group = GEOID) |>
+  select(-UHI)
 names(landcover) <- names(landcover) |>
   tolower()
+landcover$block_group <- as.character(landcover$block_group)
 
 ```
-Notably, this dataset also has a UHI variable; its definition is "The average temperature value within each feature. Evening temperature values from a 2018 Portland State University study were used." Since this is average temperature, I don't think this really counts as an urban heat index/what we're really trying to analyze here. -Stephanie
+Notably, this dataset also has a UHI variable; its definition is "The average temperature value within each feature. Evening temperature values from a 2018 Portland State University study were used." Since this is average temperature, I don't think this really counts as an urban heat index/what we're really trying to analyze here. So I dropped it (so that it wouldn't be confused when we merged with the dc_heat dataset). -Stephanie
+
+Selecting only the percentage data:
+```{r}
+
+landcover <- landcover |>
+  select(-contains("_ac"))
+
+```
+I thought percentage of land cover (canopy, impervious surfaces, etc.) is better than actual amount of land cover since some block groups are larger/smaller than others - so percentages are more readily comparable.
 
 ## Exploring Census Demographic Data
 
@@ -96,6 +109,7 @@ acs_data <- as_tibble(acs_matrix[2:nrow(acs_matrix), ],
                       .name_repair = "minimal")
 names(acs_data) <- acs_matrix[1, ]
 
+# Cleaning variable names
 names(acs_data) <- names(acs_data) |>
   str_replace(" ", "_")
 
@@ -119,6 +133,7 @@ acs_data <- acs_data |>
          inc_200000_more = B19001_017E,
          block_group_temp = block_group)
 
+# Creating block_group column to use for combining this with the other datasets
 acs_data$block_group <- paste(acs_data$state, 
                              acs_data$county, 
                              acs_data$tract, 
@@ -129,9 +144,14 @@ acs_data$block_group <- paste(acs_data$state,
 ```
 
 ## Stitching Together Final Dataset
+Noting this isn't final, but I just wanted to put something together to analyze in the interim
 ```{r}
 
+dataset_interim <- left_join(landcover, acs_data, by = "block_group") |>
+  st_transform(crs = 4326)
 
+dataset_final <- st_join(dc_heat, dataset_interim)
+  
 
 ```
 
@@ -177,7 +197,38 @@ Since there's 571 block groups, that means if we want to decide the heat thresho
 Implementing threshold:
 ```{r}
 
+dataset_final <- dataset_final |>
+  mutate(hotspot = if_else(uhi <= 7.9, "Hotspot", "Not Hotspot"))
 
+```
+
+### Running decision tree
+Note: We should do some data cleaning on dataset_final before running the decision tree but it's getting late and I am tired, so I'm leaving it as is for now -Stephanie
+```{r}
+
+set.seed(20241202)
+
+dt_split <- initial_split(data = dataset_final, prop = 0.8)
+dt_train <- training(x = dt_split) 
+dt_test <- testing(x = dt_split)
+
+dt_recipe <- recipe(formula = hotspot ~ ., data = grades_train) |>
+  themis::step_downsample(grade) |>
+  step_nzv(all_predictors())
+
+model <- decision_tree() |>
+  set_engine(engine = "rpart") |>
+  set_mode(mode = "classification")
+
+workflow <- workflow() |>
+  add_recipe(recipe) |>
+  add_model(model)
+  
+fitting <- workflow |>
+  fit(data = grades_train)
+
+rpart.plot::rpart.plot(x = fitting$fit$fit$fit,
+                       roundint = FALSE)
 
 ```
 
