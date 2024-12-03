@@ -200,34 +200,39 @@ Implementing threshold:
 dataset_final <- dataset_final |>
   mutate(hotspot = if_else(uhi <= 7.9, "Hotspot", "Not Hotspot"))
 
+dataset_dt <- dataset_final |>
+  st_drop_geometry() |>
+  select(-uhi, -block_group.x, -block_group.y, -blockgroup) 
+#dropping uhi because that would be the main decision tree factor
+
 ```
 
 ### Running decision tree
-Note: We should do some data cleaning on dataset_final before running the decision tree but it's getting late and I am tired, so I'm leaving it as is for now -Stephanie
+Note: We should do some more data cleaning on dataset_final before running the decision tree but it's getting late and I am tired, so I'm leaving it as is for now -Stephanie
 ```{r}
 
 set.seed(20241202)
 
-dt_split <- initial_split(data = dataset_final, prop = 0.8)
+dt_split <- initial_split(data = dataset_dt, prop = 0.8)
 dt_train <- training(x = dt_split) 
 dt_test <- testing(x = dt_split)
 
-dt_recipe <- recipe(formula = hotspot ~ ., data = grades_train) |>
-  themis::step_downsample(grade) |>
-  step_nzv(all_predictors())
+dt_recipe <- recipe(formula = hotspot ~ ., data = dataset_dt) |>
+  themis::step_downsample(hotspot) |> #I don't know if we need this or not...
+  step_nzv(all_numeric_predictors())
 
-model <- decision_tree() |>
+dt_model <- decision_tree() |>
   set_engine(engine = "rpart") |>
   set_mode(mode = "classification")
 
-workflow <- workflow() |>
-  add_recipe(recipe) |>
-  add_model(model)
+dt_workflow <- workflow() |>
+  add_recipe(dt_recipe) |>
+  add_model(dt_model)
   
-fitting <- workflow |>
-  fit(data = grades_train)
+dt_fitting <- dt_workflow |>
+  fit(data = dt_train)
 
-rpart.plot::rpart.plot(x = fitting$fit$fit$fit,
+rpart.plot::rpart.plot(x = dt_fitting$fit$fit$fit,
                        roundint = FALSE)
 
 ```
