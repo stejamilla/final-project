@@ -73,13 +73,13 @@ landcover <- read_sf(paste0("data/Urban_Tree_Canopy",
   # Drop other unrelated UHI index, which, here, measures average temperature
   # within each feature
   select(-UHI) |>
-  # Convert block_group to character
-  mutate(block_group = as.character(block_group))
+  mutate(block_group = as.character(block_group)) |>
+  rename_all(tolower) |>
+  # remove columns that provide measures in acres, to focus instead on
+  # percentage measures
+  select(-contains("_ac"))
 
-# Clean up names
-names(landcover) <- tolower(names(landcover))
-
-# Read in Urban Tree Canopy column names
+# Read in Urban Tree Canopy column names and clean up
 landcover_key <- read_csv("data/Urban_Tree_Canopy_Descriptions.csv",
                           col_names = FALSE) |>
   mutate(X1 = str_remove_all(X1, "\\( type:.*alias:|, length:.*| \\)")) |>
@@ -95,17 +95,9 @@ Notably, this dataset also has a UHI variable; its definition is "The average te
 JAMIE 12/3 - Makes sense!
 
 
-Selecting only the percentage data:
-```{r}
-
-# remove irrelevant columns that do not contain percentage data
-landcover <- landcover |>
-  select(-contains("_ac"))
-
-```
 STEPHANIE PRE-12/3
 I thought percentage of land cover (canopy, impervious surfaces, etc.) is better than actual amount of land cover since some block groups are larger/smaller than others - so percentages are more readily comparable.
-JAMIE 12/3 = Great idea!
+JAMIE 12/3 = Great idea! I moved this code to the original cleanup just to tidy things up.
 
 ## Exploring Census Demographic Data
 
