@@ -3,3 +3,8 @@
 .RData
 .Ruserdata
 project_docs/
+.xlsx
+.xls
+.csv
+.jpg
+data/
