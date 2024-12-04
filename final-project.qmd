@@ -323,6 +323,9 @@ This map looks a bit odd to me. It's saying the hottest part of DC is right arou
 
 Not sure how important it is for this variable to be accurate, but if it is, I'm thinking maybe we should dig into it a bit more.
 
+STEPHANIE 12/4
+It may have to do with the different methodology between maps? Unsure, maybe we should bring this up to Aaron.
+
 # Supervised Machine Learning Applications
 
 ## Decision Trees
