@@ -8,3 +8,4 @@ project_docs/
 .csv
 .jpg
 data/
+.env

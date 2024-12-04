@@ -23,6 +23,7 @@ Climate Central's UHI index values (in °F) are "estimates of how much the urban
 Loading packages:
 ```{r}
 
+library(dotenv)
 library(tidyverse)
 library(ggplot2)
 library(sf)
@@ -52,6 +53,7 @@ dc_heat <- read_sf("data/2024UHI_DC.kml") |>
   separate(temp, c("temp", "block_group", "x"), ": ") |>
   select(-city, -temp, -x, -Description) |>
   mutate(uhi = as.numeric(uhi)) |>
+  relocate(block_group, .before = uhi) |>
   # set crs
   st_set_crs(value = 4326)
 
@@ -78,7 +80,8 @@ landcover <- read_sf(paste0("data/Urban_Tree_Canopy",
   rename_all(tolower) |>
   # remove columns that provide measures in acres, to focus instead on
   # percentage measures
-  select(-contains("_ac"))
+  select(-contains("_ac")) |>
+  relocate(block_group, .after = objectid)
 
 # Create key with Urban Tree Canopy data column descriptions and clean up
 landcover_key <- read_csv("data/Urban_Tree_Canopy_Descriptions.csv",
@@ -136,34 +139,102 @@ JAMIE 12/3 - I like these variables! Here are some ideas to scale them and make 
 
 * B19001_002 through B19001_017 - Household income in the past 12 months
 - We just need to put in terms of one year's dollars - such as 2020 dollars
+- Maybe we can use a metric that standardizes this relative to the living wage in the area (using a source like the MIT living wage calculator)
 
 * B25075_002 through B25075_027 - Total value of housing units
 - Same thoughts as above, need to put in terms of one year's dollars
 
-If these are of interest, I'm happy to pull the data and add the calculations.hyg
+If these are of interest, I'm happy to pull the data and add the calculations.
 
 Loading Census variables via API:
 ```{r}
 
-# Load Census API key
+# Secure Census API key (from .env file) for use in Census API call
+load_dot_env()
 credential <- Sys.getenv("census_api_key")
-census_api_key(credential, install = TRUE, overwrite = TRUE)
 
-# Pull data via API
-url <- "https://api.census.gov/data/2020/acs/acs5?get=NAME,B01003_001E,B19001_002E,B19001_003E,B19001_004E,B19001_005E,B19001_006E,B19001_007E,B19001_008E,B19001_009E,B19001_010E,B19001_011E,B19001_012E,B19001_013E,B19001_014E,B19001_015E,B19001_016E,B19001_017E&for=block%20group:*&for=tract:*&in=state:11&in=county:001"
+### I think since we're not using the tidycensus package to obtain the ACS data,
+### we don't need this code
+# census_api_key(credential, install = TRUE, overwrite = TRUE)
 
+# Create url for API call
+url <- str_glue(paste0("https://api.census.gov/data/2020/acs/acs5?get=",
+             # Description of data point
+             "NAME,",
+             # TOTAL POPULATION ESTIMATE
+             "B01003_001E,",
+             # TOTAL LESS THAN $10,000
+             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
+             "B19001_002E,",
+             # TOTAL $10,000 - $14,999
+             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
+             "B19001_003E,",
+             # TOTAL $15,000 - $19,999
+             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS   
+             "B19001_004E,",
+             # TOTAL $20,000 - $24,999
+             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS             
+             "B19001_005E,",
+             # TOTAL $25,000 - $29,999
+             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
+             "B19001_006E,",
+             # TOTAL $30,000 - $34,999
+             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS      
+             "B19001_007E,",
+             # TOTAL $35,000 - $39,999
+             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
+             "B19001_008E,",
+             # TOTAL $40,000 - $44,999
+             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
+             "B19001_009E,",
+             # TOTAL $45,000 - $49,999
+             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
+             "B19001_010E,",
+             # TOTAL $50,000 - $59,999
+             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
+             "B19001_011E,",
+             # TOTAL $60,000 - $74,999
+             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS       
+             "B19001_012E,",
+             # TOTAL $75,000 - $99,999
+             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
+             "B19001_013E,",
+             # TOTAL $100,000 - $124,999
+             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
+             "B19001_014E,",
+             # TOTAL $125,000 - $149,999
+             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
+             "B19001_015E,",
+             # TOTAL $150,000 - $199,999
+             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
+             "B19001_016E,",
+             # TOTAL $200,000 or more
+             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
+             "B19001_017E",
+             # Limit to block-group-level data for DC
+             "&for=block%20group:*&for=tract:*&in=state:11&in=county:001"))
+
+# Use url to request data from API
 acs_json <- GET(url = url)
+
+# Check call status
 http_status(acs_json)
+
+# Save API JSON response as text
 acs_json <- content(acs_json, as = "text")
+
+# Save JSON as character matrix
 acs_matrix <- fromJSON(acs_json)
+
+# Convert matrix to tibble
 acs_data <- as_tibble(acs_matrix[2:nrow(acs_matrix), ],
                       .name_repair = "minimal")
-names(acs_data) <- acs_matrix[1, ]
 
-# Clean variable names
-names(acs_data) <- names(acs_data) |>
+# Add variable names to tibble
+names(acs_data) <- acs_matrix[1, ] |>
   str_replace(" ", "_")
 
+# Clean up data
 acs_data <- acs_data |>
   rename(total_pop = B01003_001E,
          nc_less_10000 = B19001_002E,
@@ -182,15 +253,15 @@ acs_data <- acs_data |>
          inc_125000_149999 = B19001_015E,
          inc_150000_199999 = B19001_016E,
          inc_200000_more = B19001_017E,
-         block_group_temp = block_group)
-
-# Create block_group column to use for combining this with the other datasets
-acs_data$block_group <- paste(acs_data$state, 
-                             acs_data$county, 
-                             acs_data$tract, 
-                             acs_data$block_group_temp,
-                             sep = "")
-
+         block_group_temp = block_group) |>
+  # Create block_group column to use for combining this with the other datasets
+  mutate(block_group = paste(state,
+                             county, 
+                             tract, 
+                             block_group_temp,
+                             sep = "")) |>
+  rename_all(tolower) |>
+  relocate(block_group, .before = name)
                              
 ```
 
@@ -199,11 +270,15 @@ STEPHANIE PRE-12/3
 Noting this isn't final, but I just wanted to put something together to analyze in the interim
 ```{r}
 
+# Combine datasets
 dataset_interim <- left_join(landcover, acs_data, by = "block_group") |>
   st_transform(crs = 4326)
 
-dataset_final <- st_join(dc_heat, dataset_interim)
-  
+### ERROR - duplicating rows! Trying to figure out a fix...
+# Create final dataset
+dataset_final <- st_join(x = dc_heat,
+                         y = dataset_interim,
+                         join = st_intersects)
 
 ```
 
