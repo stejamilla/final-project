@@ -287,9 +287,10 @@ acs_data <- acs_data |>
 STEPHANIE PRE-12/3
 Noting this isn't final, but I just wanted to put something together to analyze in the interim
 JAMIE 12/3 - I keep getting multiple duplicates, with an additional block_group column being added, and the block groups not matching. Stuck on this error. I think it's because the geometry in landcover doesn't align with that of dc_heat?
+Stephanie 12/4
+Should be good now
 ```{r}
 
-# this code is fine
 dataset_interim <- left_join(acs_data, st_drop_geometry(dc_heat), by = "block_group")
 dataset_final <- left_join(dataset_interim, landcover, by = "block_group")
 
