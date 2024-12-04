@@ -68,6 +68,9 @@ I like this idea! That makes sense! Are you thinking we'll use the geometry in t
 MADELEINE 12/4
 agreed!
 
+Stephanie 12/4
+We need the geometry column to make any mapping data visualizations but we should drop the geometry when actually doing supervised machine learning
+
 ## Cleaning DC Land Cover Data
 ```{r}
 
@@ -353,12 +356,14 @@ dataset_final <- dataset_final |>
 
 dataset_dt <- dataset_final |>
   st_drop_geometry() |>
-  select(-uhi, -block_group.x, -block_group.y, -blockgroup) 
+  select(-uhi, -block_group.x, -block_group.y) 
 #dropping uhi because that would be the main decision tree factor
 
 ```
 MADELEINE 12/4
 I am getting an error in the last line of the above chunk because there is no variable "blockgroup" in dataset_final. Not removing it from the code since I'm not sure what other variable you meant to exclude
+Stephanie 12/4
+Whoops, that was because when I was exploring the data things were getting messy for me and I accidentally had that column.
 
 ### Running decision tree
 STEPHANIE PRE-12/3
