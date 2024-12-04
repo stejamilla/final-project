@@ -63,7 +63,7 @@ STEPHANIE PRE-12/3
 I read more about (the methodology)[https://www.climatecentral.org/climate-matters/urban-heat-islands-2024] of this dataset and realized that Climate Central basically created the UHI index by analyzing things like land cover types, percentage of greenspace, albedo, population density, etc to create this dataset. So in a way, this project is almost seeing if we can replicate their model - which they used for 65 cities, specifically for DC. I think we can frame this as using DC-specific data and seeing if there are important factors Climate Central overlooked or if we think their model is valid. -Stephanie
 
 JAMIE 12/3
-I like this idea! That makes sense!
+I like this idea! That makes sense! Are you thinking we'll use the geometry in the landcover dataset? Or were you thinking of just using the data per block group? Performing st_join to combine acs_data, landcover, and dc_heat produces duplicates in dataset_final, so I added a line of code to drop the geometry from landcover. Not sure if I'm going about this correctly.
 
 MADELEINE 12/4
 agreed!
@@ -283,17 +283,15 @@ acs_data <- acs_data |>
 ## Stitching Together Final Dataset
 STEPHANIE PRE-12/3
 Noting this isn't final, but I just wanted to put something together to analyze in the interim
+JAMIE 12/3 - I keep getting multiple duplicates, with an additional block_group column being added, and the block groups not matching. Stuck on this error. I think it's because the geometry in landcover doesn't align with that of dc_heat?
 ```{r}
 
-# Combine datasets
+# this code is fine
 dataset_interim <- left_join(landcover, acs_data, by = "block_group") |>
   st_transform(crs = 4326)
 
-### ERROR - duplicating rows! Trying to figure out a fix...
-# Create final dataset
-dataset_final <- st_join(x = dc_heat,
-                         y = dataset_interim,
-                         join = st_intersects)
+# when we join these, it creates about 6 dupes for each block group with mismatched second block_group column
+dataset_final <- st_join(dc_heat, dataset_interim)
 
 ```
 
