@@ -65,6 +65,9 @@ I read more about (the methodology)[https://www.climatecentral.org/climate-matte
 JAMIE 12/3
 I like this idea! That makes sense!
 
+MADELEINE 12/4
+agreed!
+
 ## Cleaning DC Land Cover Data
 ```{r}
 
@@ -101,6 +104,8 @@ JAMIE 12/3 - Makes sense!
 STEPHANIE PRE-12/3
 I thought percentage of land cover (canopy, impervious surfaces, etc.) is better than actual amount of land cover since some block groups are larger/smaller than others - so percentages are more readily comparable.
 JAMIE 12/3 = Great idea! I moved this code to the earlier cleanup chunk just to tidy things up.
+
+MADELEINE 12/4 - good w all these steps!
 
 ## Exploring Census Demographic Data
 
@@ -146,7 +151,17 @@ JAMIE 12/3 - I like these variables! Here are some ideas to scale them and make 
 
 If these are of interest, I'm happy to pull the data and add the calculations.
 
-Loading Census variables via API:
+MADELEINE 12/4:
+I think all the variables listed above sound good. I'd perhaps add either
+* B25064_001 - Median gross rent, or
+* B25071_001 - Median gross rent as a percentage of household income
+
+Thinking that these help provide more of a sense of what it actually costs to live in that neighborhood vs. just the value of property (though I also think value is important).
+
+A couple questions:
+- I'm not sure we need to convert to 2020 dollars since it seems like that may have already been done? If you look at the concept column for the B19001 vars, for instance, it says "in 2020 inflation-adjusted dollars".
+- Is there a reason we are planning to use the bracketed variables instead of continuous? for instance, B19001_01 vs. 02 through 017
+
 ```{r}
 
 # Secure Census API key (from .env file) for use in Census API call
@@ -302,6 +317,11 @@ dc_heat |>
 STEPHANIE PRE-12/3
 Notably, every block group in DC boosts temperatures bt 5.7 degrees or more. There's no block group that doesn't have a boost in temperature.
 
+MADELEINE 12/4
+This map looks a bit odd to me. It's saying the hottest part of DC is right around the White House? Which is an area with a decent amount of parks and greenery. It also doesn't seem to match [other heat maps](https://www-washingtonpost-com.proxy.library.georgetown.edu/weather/2018/10/15/sizzling-summer-days-northeast-dc-heats-up-most-noaa-analysis-shows/er/2018/10/15/sizzling-summer-days-northeast-dc-heats-up-most-noaa-analysis-shows/) I found online, which tend to show NE as the hottest area.
+
+Not sure how important it is for this variable to be accurate, but if it is, I'm thinking maybe we should dig into it a bit more.
+
 # Supervised Machine Learning Applications
 
 ## Decision Trees
@@ -324,6 +344,9 @@ heat_freq$cumulative <- cumsum(heat_freq$n)
 STEPHANIE PRE-12/3
 Since there's 571 block groups, that means if we want to decide the heat threshold is where 50% of the data is above/below this line, then we'd want to pick the UHI value where cumulative = 285 or 286. The closest datapoint is UHI = 7.9 (Where cumulative = 268). I vote that we pick UHI <= 7.9 means not a heat island whereas UHI > 7.9 means it is a heat island.
 
+MADELEINE 12/4
+We might want to consider a higher threshold? I'm thinking it would be more meaningful to point out, say, the hottest 25% of block groups vs. the top 50%.
+
 Implementing threshold:
 ```{r}
 
@@ -336,6 +359,8 @@ dataset_dt <- dataset_final |>
 #dropping uhi because that would be the main decision tree factor
 
 ```
+MADELEINE 12/4
+I am getting an error in the last line of the above chunk because there is no variable "blockgroup" in dataset_final. Not removing it from the code since I'm not sure what other variable you meant to exclude
 
 ### Running decision tree
 STEPHANIE PRE-12/3
