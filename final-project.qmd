@@ -359,7 +359,7 @@ dataset_final <- dataset_final |>
 
 dataset_dt <- dataset_final |>
   st_drop_geometry() |>
-  select(-uhi, -block_group.x, -block_group.y) 
+  select(-uhi, -geometry) 
 #dropping uhi because that would be the main decision tree factor
 
 ```
@@ -398,6 +398,8 @@ rpart.plot::rpart.plot(x = dt_fitting$fit$fit$fit,
                        roundint = FALSE)
 
 ```
+Stephanie 12/4
+Looks like block group is the main determinant, which makes sense haha - should probably remove that column.
 
 ## Linear Regression
 ```{r}
