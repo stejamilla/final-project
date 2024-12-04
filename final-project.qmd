@@ -63,7 +63,7 @@ STEPHANIE PRE-12/3
 I read more about (the methodology)[https://www.climatecentral.org/climate-matters/urban-heat-islands-2024] of this dataset and realized that Climate Central basically created the UHI index by analyzing things like land cover types, percentage of greenspace, albedo, population density, etc to create this dataset. So in a way, this project is almost seeing if we can replicate their model - which they used for 65 cities, specifically for DC. I think we can frame this as using DC-specific data and seeing if there are important factors Climate Central overlooked or if we think their model is valid. -Stephanie
 
 JAMIE 12/3
-I like this idea! That makes sense!
+I like this idea! That makes sense! Are you thinking we'll use the geometry in the landcover dataset? Or were you thinking of just using the data per block group? Performing st_join to combine acs_data, landcover, and dc_heat produces duplicates in dataset_final, so I added a line of code to drop the geometry from landcover. Not sure if I'm going about this correctly.
 
 ## Cleaning DC Land Cover Data
 ```{r}
@@ -81,7 +81,8 @@ landcover <- read_sf(paste0("data/Urban_Tree_Canopy",
   # remove columns that provide measures in acres, to focus instead on
   # percentage measures
   select(-contains("_ac")) |>
-  relocate(block_group, .after = objectid)
+  relocate(block_group, .after = objectid) |>
+  st_drop_geometry()
 
 # Create key with Urban Tree Canopy data column descriptions and clean up
 landcover_key <- read_csv("data/Urban_Tree_Canopy_Descriptions.csv",
@@ -268,17 +269,13 @@ acs_data <- acs_data |>
 ## Stitching Together Final Dataset
 STEPHANIE PRE-12/3
 Noting this isn't final, but I just wanted to put something together to analyze in the interim
+JAMIE 12/3 - I replaced the original code below because it kept duplicating records on st_join. I think this is because landcover has a geometry but it's different than the kind in dc_heat? I'm not sure I fully get it, but it was matching the geometries of one dataset to multiple block groups in the other. When creating landcover, I removed the geometry from it. Then below, I joined two pure dfs (no sf in class) to the dc_heat sf object. If we are only using landcover for its data per block group, and not geometries, it seems like this is the simplest fix.
 ```{r}
 
 # Combine datasets
-dataset_interim <- left_join(landcover, acs_data, by = "block_group") |>
-  st_transform(crs = 4326)
-
-### ERROR - duplicating rows! Trying to figure out a fix...
-# Create final dataset
-dataset_final <- st_join(x = dc_heat,
-                         y = dataset_interim,
-                         join = st_intersects)
+dataset_final <- dc_heat |>
+  left_join(landcover, by = "block_group") |>
+  left_join(acs_data, by = "block_group")
 
 ```
 
