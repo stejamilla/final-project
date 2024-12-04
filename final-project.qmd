@@ -290,11 +290,11 @@ JAMIE 12/3 - I keep getting multiple duplicates, with an additional block_group 
 ```{r}
 
 # this code is fine
-dataset_interim <- left_join(landcover, acs_data, by = "block_group") |>
-  st_transform(crs = 4326)
+dataset_interim <- left_join(acs_data, st_drop_geometry(dc_heat), by = "block_group")
+dataset_final <- left_join(dataset_interim, landcover, by = "block_group")
 
-# when we join these, it creates about 6 dupes for each block group with mismatched second block_group column
-dataset_final <- st_join(dc_heat, dataset_interim)
+# checking to make sure we have all the variables
+colnames(dataset_final)
 
 ```
 
