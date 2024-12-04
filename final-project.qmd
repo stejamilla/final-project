@@ -63,7 +63,7 @@ STEPHANIE PRE-12/3
 I read more about (the methodology)[https://www.climatecentral.org/climate-matters/urban-heat-islands-2024] of this dataset and realized that Climate Central basically created the UHI index by analyzing things like land cover types, percentage of greenspace, albedo, population density, etc to create this dataset. So in a way, this project is almost seeing if we can replicate their model - which they used for 65 cities, specifically for DC. I think we can frame this as using DC-specific data and seeing if there are important factors Climate Central overlooked or if we think their model is valid. -Stephanie
 
 JAMIE 12/3
-I like this idea! That makes sense! Are you thinking we'll use the geometry in the landcover dataset? Or were you thinking of just using the data per block group? Performing st_join to combine acs_data, landcover, and dc_heat produces duplicates in dataset_final, so I added a line of code to drop the geometry from landcover. Not sure if I'm going about this correctly.
+I like this idea! That makes sense! Are you thinking we'll use the geometry in the landcover dataset? Or were you thinking of just using the data per block group?
 
 ## Cleaning DC Land Cover Data
 ```{r}
