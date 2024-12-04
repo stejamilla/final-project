@@ -269,7 +269,7 @@ acs_data <- acs_data |>
 ## Stitching Together Final Dataset
 STEPHANIE PRE-12/3
 Noting this isn't final, but I just wanted to put something together to analyze in the interim
-JAMIE 12/3 - I replaced the original code below because it kept duplicating records on st_join. I think this is because landcover has a geometry but it's different than the kind in dc_heat? I'm not sure I fully get it, but it was matching the geometries of one dataset to multiple block groups in the other. When creating landcover, I removed the geometry from it. Then below, I joined two pure dfs (no sf in class) to the dc_heat sf object. If we are only using landcover for its data per block group, and not geometries, it seems like this is the simplest fix.
+JAMIE 12/3 - I replaced the original code below because it kept duplicating records on st_join. I think this is because landcover has a geometry but it's different than the kind in dc_heat? I'm not sure I fully get it, but it was matching the geometries of one dataset to multiple block groups in the other. When creating landcover, I removed the geometry from it. Then below, I joined two pure dfs (no sf in class) to the dc_heat sf object. If we are only using landcover for its data per block group, and not geometries, it seems like this is the simplest fix?
 ```{r}
 
 # Combine datasets
