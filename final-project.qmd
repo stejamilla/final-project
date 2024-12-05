@@ -165,6 +165,9 @@ A couple questions:
 - I'm not sure we need to convert to 2020 dollars since it seems like that may have already been done? If you look at the concept column for the B19001 vars, for instance, it says "in 2020 inflation-adjusted dollars".
 - Is there a reason we are planning to use the bracketed variables instead of continuous? for instance, B19001_01 vs. 02 through 017
 
+Stephanie 12/4
+Remember we have to think about weights!
+
 ```{r}
 
 # Secure Census API key (from .env file) for use in Census API call
@@ -294,7 +297,7 @@ Should be good now
 dataset_interim <- left_join(acs_data, st_drop_geometry(dc_heat), by = "block_group")
 dataset_final <- left_join(dataset_interim, landcover, by = "block_group")
 
-# checking to make sure we have all the variables
+# Checking to make sure we have all the variables
 colnames(dataset_final)
 
 ```
@@ -360,7 +363,7 @@ dataset_final <- dataset_final |>
 
 dataset_dt <- dataset_final |>
   st_drop_geometry() |>
-  select(-uhi, -geometry) 
+  select(-uhi, -geometry, -block_group, -name, -intptlat, -intptlon) 
 #dropping uhi because that would be the main decision tree factor
 
 ```
