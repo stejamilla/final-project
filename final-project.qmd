@@ -301,11 +301,9 @@ acs_data <- acs_data |>
 ```
 
 ## Stitching Together Final Dataset
-STEPHANIE PRE-12/3
-Noting this isn't final, but I just wanted to put something together to analyze in the interim
-JAMIE 12/3 - I keep getting multiple duplicates, with an additional block_group column being added, and the block groups not matching. Stuck on this error. I think it's because the geometry in landcover doesn't align with that of dc_heat?
-Stephanie 12/4
-Should be good now
+
+Stephanie 12/11 - We'll have to change the bottom code due to using different temperature data
+
 ```{r}
 
 dataset_interim <- left_join(acs_data, st_drop_geometry(dc_heat), by = "block_group")
@@ -317,25 +315,20 @@ colnames(dataset_final)
 ```
 
 ## Initial EDA
-### DC Heat Map
+### DC Temperature Map
+
+Stephanie 12/11 - We'll have to change the bottom code due to using different temperature data
+
 ```{r}
 
 
 ```
-STEPHANIE PRE-12/3
-Notably, every block group in DC boosts temperatures bt 5.7 degrees or more. There's no block group that doesn't have a boost in temperature.
-
-MADELEINE 12/4
-This map looks a bit odd to me. It's saying the hottest part of DC is right around the White House? Which is an area with a decent amount of parks and greenery. It also doesn't seem to match [other heat maps](https://www-washingtonpost-com.proxy.library.georgetown.edu/weather/2018/10/15/sizzling-summer-days-northeast-dc-heats-up-most-noaa-analysis-shows/er/2018/10/15/sizzling-summer-days-northeast-dc-heats-up-most-noaa-analysis-shows/) I found online, which tend to show NE as the hottest area.
-
-Not sure how important it is for this variable to be accurate, but if it is, I'm thinking maybe we should dig into it a bit more.
-
-STEPHANIE 12/4
-It may have to do with the different methodology between maps? Unsure, maybe we should bring this up to Aaron.
 
 # Supervised Machine Learning Applications
 
 ## Decision Trees
+
+Stephanie 12/11 - We'll have to change the bottom code due to using different temperature data
 
 Deciding the threshold for hot vs. not hot:
 ```{r}
@@ -370,10 +363,6 @@ dataset_dt <- dataset_final |>
 #dropping uhi because that would be the main decision tree factor
 
 ```
-MADELEINE 12/4
-I am getting an error in the last line of the above chunk because there is no variable "blockgroup" in dataset_final. Not removing it from the code since I'm not sure what other variable you meant to exclude
-Stephanie 12/4
-Whoops, that was because when I was exploring the data things were getting messy for me and I accidentally had that column.
 
 ### Running decision tree
 STEPHANIE PRE-12/3
