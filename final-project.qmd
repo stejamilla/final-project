@@ -93,7 +93,7 @@ dc <- landcover |>
   st_transform(crs = crs(temp_test)) # Aligning coordinate systems
 
 # Aligning coordinate systems
-heat <- extract(temp_test, dc, fun = max)
+heat <- extract(temp_test, dc, fun = mean)
 
 # Creating temperature dataset
 dc_temp <- bind_cols(heat, dc) |>
