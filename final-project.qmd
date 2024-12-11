@@ -84,20 +84,45 @@ STEPHANIE 12/10 - I've readded UHI since we may use it if the temperature data d
 Initial testing of raster data manipulation (to delete)
 ```{r}
 
-# Loading sample temperature raster data from 7/1/20
-temp_test <- raster("data/subset.nc", varname = "tmax")
+# Loading average July 2020 land surface temperature data
+temp_test <- raster("data/MOD_LSTD_M_2020-07-01_rgb_3600x1800.FLOAT.TIFF")
 
 # Pulling out the geometry from the landcover data
 dc <- landcover |>
-  dplyr::select(geometry) |>
+  dplyr::select(geometry, block_group) |>
   st_transform(crs = crs(temp_test)) # Aligning coordinate systems
 
 # Aligning coordinate systems
-heat <- extract(temp_test, dc, fun = mean)
+heat <- extract(temp_test, dc, fun = max)
 
-plot(temp_test)
+# Creating temperature dataset
+dc_temp <- bind_cols(heat, dc) |>
+  rename(temp = ...1) 
+
+dc_temp_sf <- st_as_sf(dc_temp) 
+
+dc_temp |>
+  count(temp)
+
+# Visualizing temperature data
+dc_temp_sf |>
+  ggplot() +
+  geom_sf(mapping = aes(fill = temp)) +
+  scale_fill_gradient(
+    'Temperature',
+    low = 'blue',
+    high = 'red'
+  ) +
+  labs(title = "DC Average July 2020 Temperature") +
+  theme_minimal() 
+
+# Exploring UHI variable
+st_drop_geometry(landcover) |>
+  count(uhi)
 
 ```
+Stephanie 12/10 - Downloaded temperature data from NASA's Earth Observations: https://neo.gsfc.nasa.gov/view.php?datasetId=MOD_LSTD_M&date=2020-07-01
+
 
 ## Exploring Census Demographic Data
 
