@@ -123,7 +123,6 @@ st_drop_geometry(landcover) |>
 ```
 Stephanie 12/10 - Downloaded temperature data from NASA's Earth Observations: https://neo.gsfc.nasa.gov/view.php?datasetId=MOD_LSTD_M&date=2020-07-01
 
-
 ## Exploring Census Demographic Data
 
 ```{r}
