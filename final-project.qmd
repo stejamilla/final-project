@@ -35,8 +35,6 @@ library(stringr)
 library(jsonlite)
 library(httr)
 library(tidymodels)
-library(sp) # Make sure to use install.packages("sp") before using this line of code
-library(raster) # Make sure to use install.packages("raster") before using this line of code
 
 # Clone the private github repository for this assignment using SSH link:
 # git@github.com:stejamilla/final-project.git
@@ -64,7 +62,11 @@ landcover <- read_sf(paste0("data/Urban_Tree_Canopy",
   # remove columns that provide measures in acres, to focus instead on
   # percentage measures
   dplyr::select(-contains("_ac")) |>
-  relocate(block_group, .after = objectid)
+  relocate(block_group, .after = objectid) |>
+  # Converting UHI to Fahrenheit
+  mutate(
+    uhi = (uhi*(9/5) + 32)
+  )
 
 # Create key with Urban Tree Canopy data column descriptions and clean up
 landcover_key <- read_csv("data/Urban_Tree_Canopy_Descriptions.csv",
@@ -77,12 +79,13 @@ landcover_key <- read_csv("data/Urban_Tree_Canopy_Descriptions.csv",
   mutate(field = tolower(field))
   
 ```
-STEPHANIE 12/10 - I've readded UHI since we may use it if the temperature data doesn't work out. Also, the "raster" package/library also has its own select() function, so if we mean the dplyr select() function moving forward, we'll have to use dplyr::select(). Also moved this up before the temperature data since we need to load the geometry data to then use with the temp data below.
+STEPHANIE 12/10 - I've readded UHI since we may use it if the temperature data doesn't work out. ~~Also, the "raster" package/library also has its own select() function, so if we mean the dplyr select() function moving forward, we'll have to use dplyr::select().~~ Also moved this up before the temperature data since we need to load the geometry data to then use with the temp data below.
 
 ## Cleaning Temperature Data
 
 Initial testing of raster data manipulation (to delete)
 ```{r}
+#| eval: false
 
 # Loading average July 2020 land surface temperature data
 temp_test <- raster("data/MOD_LSTD_M_2020-07-01_rgb_3600x1800.FLOAT.TIFF")
@@ -181,6 +184,25 @@ A couple questions:
 Stephanie 12/4
 Remember we have to think about weights!
 
+
+
+MADELEINE 12/12: I added the following variables: Population by race (B02001...), total continuous HH income (B19001_001E), median property value (B25077_001E), total property value (	
+B25075_001E), median gross rent as % HH income (B25071_001E), total educational attainment (B15003_001E). Some notes/thoughts:
+
+* We obviously don't need both the income categories and the continuous income - I just wanted to add in everything for now for data exploration. We can always drop the variables we're not using later downstream
+
+* Also prob don't need both total and median property values - just wanted to look at both
+
+* Also wondering if we should use median HH income instead of total?
+
+* I believe the race categories I included should sum to the total population, but will test this
+
+* I'm not sure what "total educational attainment" looks like - will do some testing there too. If it's hard to interpret or not in a useful format, we can use the categorical education variables (would probably want to consolidate them into fewer categories like HS or less, some college, BA+)
+
+* It occurs to me we may need to choose baseline categories for any categorical variables we include and leave those out? Not sure if that is only a requirement for linear regression? 
+
+## Loading Census demographic data via API
+
 ```{r}
 
 # Secure Census API key (from .env file) for use in Census API call
@@ -197,6 +219,18 @@ url <- str_glue(paste0("https://api.census.gov/data/2020/acs/acs5?get=",
              "NAME,",
              # TOTAL POPULATION ESTIMATE
              "B01003_001E,",
+             # TOTAL POPULATION BY RACE - WHITE ALONE
+             "B02001_002E,",
+             # TOTAL POPULATION BY RACE - BLACK OR AFR AMER ALONE
+             "B02001_003E,",
+             # TOTAL POPULATION BY RACE - AMER IND AND AK NAT ALONE
+             "B02001_004E,",
+             # TOTAL POPULATION BY RACE - ASIAN ALONE
+             "B02001_005E,",
+             # TOTAL POPULATION BY RACE - NAT HAW OR PAC ISL ALONE
+             "B02001_006E,",
+             # TOTAL POPULATION BY RACE - OTHER ALONE + TWO OR MORE RACES
+             "B02001_008E,",
              # TOTAL LESS THAN $10,000
              # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
              "B19001_002E,",
@@ -244,7 +278,20 @@ url <- str_glue(paste0("https://api.census.gov/data/2020/acs/acs5?get=",
              "B19001_016E,",
              # TOTAL $200,000 or more
              # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
-             "B19001_017E",
+             "B19001_017E,",
+             # TOTAL CONTINUOUS
+             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
+             "B19001_001E,",
+             # MEDIAN PROPERTY VALUE
+             "B25077_001E,",
+             # TOTAL PROPERTY VALUE
+             "B25075_001E,",
+             # MEDIAN GROSS RENT
+             # AS A PERCENTAGE OF HOUSEHOLD INCOME IN THE PAST 12 MONTHS
+             "B25071_001E,",
+             # TOTAL EDUCATIONAL ATTAINMENT
+             # FOR THE POPULATION 25 YEARS AND OLDER
+             "B15003_001E",
              # Limit to block-group-level data for DC
              "&for=block%20group:*&for=tract:*&in=state:11&in=county:001"))
 
@@ -271,6 +318,12 @@ names(acs_data) <- acs_matrix[1, ] |>
 # Clean up data
 acs_data <- acs_data |>
   rename(total_pop = B01003_001E,
+         pop_race_white = B02001_002E,
+         pop_race_black = B02001_003E,
+         pop_race_amerind = B02001_004E,
+         pop_race_asian = B02001_005E,
+         pop_race_hi_pi = B02001_006E,
+         pop_race_oth_mult = B02001_008E,
          nc_less_10000 = B19001_002E,
          inc_10000_14999 = B19001_003E,
          inc_15000_19999 = B19001_004E,
@@ -287,6 +340,11 @@ acs_data <- acs_data |>
          inc_125000_149999 = B19001_015E,
          inc_150000_199999 = B19001_016E,
          inc_200000_more = B19001_017E,
+         inc_continuous = B19001_001E,
+         med_prop_val = B25077_001E,
+         tot_prop_val = B25075_001E,
+         med_rent_pct_inc = B25071_001E,
+         educ_total = B15003_001E,
          block_group_temp = block_group) |>
   # Create block_group column to use for combining this with the other datasets
   mutate(block_group = paste(state,
@@ -294,20 +352,51 @@ acs_data <- acs_data |>
                              tract, 
                              block_group_temp,
                              sep = "")) |>
+  # Median property value and median rent as % HH income need some recoding
+  # I'm replacing -666666's with 0. This might not be a complete solution,
+  # but didn't want to introduce NA's into our data if not necessary
+  mutate(
+    med_prop_val = if_else(
+      med_prop_val >= 1, med_prop_val, "0"),
+    med_rent_pct_inc = if_else(
+      med_rent_pct_inc >= 1, med_rent_pct_inc, "0")
+    ) |>
   rename_all(tolower) |>
   relocate(block_group, .before = name)
                              
 ```
 
+
+Exploration of some of the continuous variables
+```{r}
+
+# Income continuous
+acs_data |>
+  ggplot() +
+  geom_histogram(aes(x = as.numeric(inc_continuous))
+  )
+
+# Total educational attainment
+acs_data |>
+  ggplot() +
+  geom_histogram(aes(x = as.numeric(educ_total))
+  )
+# Still not sure how to interpret this one. Might be worth going back to the categories
+```
 ## Stitching Together Final Dataset
 
 Stephanie 12/11 - We'll have to change the bottom code due to using different temperature data
-
+MA 12/12 - Changed this to just join acs_data and landcover - may need more edits
 ```{r}
 
-dataset_interim <- left_join(acs_data, st_drop_geometry(dc_heat), by = "block_group")
-dataset_final <- left_join(dataset_interim, landcover, by = "block_group")
+#dataset_interim <- left_join(acs_data, st_drop_geometry(dc_heat), by = "block_group")
+#dataset_final <- left_join(dataset_interim, landcover, by = "block_group")
 
+## Checking to make sure we have all the variables
+#colnames(dataset_final)
+
+# MA: copied and then commented out the above; rewriting with just ACS + landcover
+dataset_final <- left_join(acs_data, landcover, by = "block_group")
 # Checking to make sure we have all the variables
 colnames(dataset_final)
 
@@ -317,9 +406,26 @@ colnames(dataset_final)
 ### DC Temperature Map
 
 Stephanie 12/11 - We'll have to change the bottom code due to using different temperature data
-
+MA 12/12 - Created new map using landcover 'uhi' variable for temperature, but only using 'landcover' as a dataset - need to figure out how to make 'dataset_final' work
 ```{r}
 
+# MA: This just uses 'landcover'. I was getting errors trying to run the same code using 'dataset_final'
+# even though it should have all the same geometry data. Not sure if I'm forgetting a step
+
+landcover |> ggplot() +
+  geom_sf(
+    mapping = aes(fill = uhi),
+    color = "white"
+    ) +
+    scale_fill_gradient(
+    low = "#f7ef9d",
+    high = "#be2b25"
+    ) +
+  labs(
+    title = "Average evening temperature, 2018",
+    fill = "Temperature (degrees F)"
+  ) +
+  theme_void()
 
 ```
 
@@ -328,20 +434,25 @@ Stephanie 12/11 - We'll have to change the bottom code due to using different te
 ## Decision Trees
 
 Stephanie 12/11 - We'll have to change the bottom code due to using different temperature data
-
+Madeleine 12/12 - Updated this to work with UHI variable from landcover
 Deciding the threshold for hot vs. not hot:
 ```{r}
 
 # visualizing a cumulative histogram of counts of UHI values
-dc_heat |>
+dataset_final |>
   group_by(uhi) |>
   ggplot(aes(uhi)) +
   geom_histogram(aes(y = cumsum(..count..)))
 
 # calculating frequency & cumulative frequency
-heat_freq <- dc_heat |>
+heat_freq <- dataset_final |>
   count(uhi)
 heat_freq$cumulative <- cumsum(heat_freq$n) 
+
+heat_freq |>
+  filter(
+    cumulative >= 285,
+    cumulative <= 286) |> head()
 
 ```
 STEPHANIE PRE-12/3
@@ -350,11 +461,14 @@ Since there's 571 block groups, that means if we want to decide the heat thresho
 MADELEINE 12/4
 We might want to consider a higher threshold? I'm thinking it would be more meaningful to point out, say, the hottest 25% of block groups vs. the top 50%.
 
+MADELEINE 12/12
+New 50% threshold (UHI data from landcover; C to F conversion) is 90.1.
+
 Implementing threshold:
 ```{r}
 
 dataset_final <- dataset_final |>
-  mutate(hotspot = if_else(uhi <= 7.9, "Hotspot", "Not Hotspot"))
+  mutate(hotspot = if_else(uhi <= 90.1, "Hotspot", "Not Hotspot"))
 
 dataset_dt <- dataset_final |>
   st_drop_geometry() |>
