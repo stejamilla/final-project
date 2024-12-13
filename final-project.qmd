@@ -309,17 +309,42 @@ acs_data <- acs_data |>
 
 # Creating the Final Dataset for Analysis
 
+STEPHANIE 12/13 - I had to move this up and change the dataset from dc_train to landcover because we have to show how we determine the threshold before using mutate on it in the following code chunk.
+
+Deciding the threshold for hot vs. not hot:
+```{r}
+
+# visualizing a cumulative histogram of counts of UHI values
+landcover |>
+  group_by(uhi) |>
+  ggplot(aes(uhi)) +
+  geom_histogram(aes(y = cumsum(..count..)))
+
+# calculating frequency & cumulative frequency
+heat_freq <- landcover |>
+  count(uhi)
+
+heat_freq$cumulative <- cumsum(heat_freq$n)
+
+heat_freq |>
+  filter(
+    cumulative >= 285,
+    cumulative <= 286) |>
+  head()
+
+```
+
 JAMIE 12/12: Note I changed the name of the main df we are using pre-split to "dc_full_data." ALSO note that I moved the hotspot / not hotspot var to the below code chunk to streamline data cleanup.
 
-Moved your threshold notes here:
-STEPHANIE PRE-12/3
-Since there's 571 block groups, that means if we want to decide the heat threshold is where 50% of the data is above/below this line, then we'd want to pick the UHI value where cumulative = 285 or 286. The closest datapoint is UHI = 7.9 (Where cumulative = 268). I vote that we pick UHI <= 7.9 means not a heat island whereas UHI > 7.9 means it is a heat island.
+STEPHANIE 12/13 - There's something odd happening with race_eth_hisp_ratio, because I'm looking at the training data and the values are all 1 (or NaN), which presumably means that the population share of hispanic/latino is 100% for each block group, which presumably wouldn't happen??
 
-MADELEINE 12/4
-We might want to consider a higher threshold? I'm thinking it would be more meaningful to point out, say, the hottest 25% of block groups vs. the top 50%.
+Moved your threshold notes here:
 
 MADELEINE 12/12
 New 50% threshold (UHI data from landcover; C to F conversion) is 90.1.
+
+STEPHANIE 12/13
+Did we want to go with 25% for hotspot vs 75%? I'm fine to change the threshold, we'll just have to justify which level to go for.
 
 
 ```{r}
@@ -367,8 +392,12 @@ dc_full_data <- left_join(landcover, acs_data, by = "block_group") |>
     race_oth_mult_ratio = race_oth_mult / total_pop,
     # calculate pop share hispanic or latino
     race_eth_hisp_ratio = race_eth_hisp / total_pop,
+    # calculate total non-white population
+    race_poc = race_black + race_ai_an + race_asian + race_nh_pi + race_oth_mult,
+    # calculate pop share non-white
+    race_poc_ratio = race_poc / total_pop,
     # creating hotspot var for decision tree model
-    hotspot = if_else(uhi <= 90.1, "hotspot", "not hotspot"),
+    hotspot = if_else(uhi >= 90.1, "hotspot", "not hotspot"),
     # remove factor from uhi var
     uhi = as.numeric(as.character(uhi))) |>
   relocate(c("block_group_temp", "tract"), .after = 2) |>
@@ -418,6 +447,7 @@ dc_test <- testing(x = dc_split)
 ```
 
 JAMIE 12/12 - Do we want folds? added here. Not using folds does not make the lm rank deficient model warning go away.
+STEPHANIE 12/13 - I think yes, we'll have to use it, especially for hyper parameter tuning.
 
 ```{r}
 
@@ -427,6 +457,7 @@ dc_folds <- vfold_cv(data = dc_train, v = 10)
 ```
 
 JAMIE 12/12 - Since we can only do EDA on the training data - I moved the maps and vizs down here and changed the dfs to the training one!
+STEPHANIE 12/13 - Sounds good
 
 # Initial EDA
 
@@ -456,6 +487,10 @@ JAMIE 12/12 - when we run the below viz we have a warning message that 56 rows w
 
 * I silenced the total ed attainment ggplot per by above note.
 
+STEPHANIE 12/13 - concerning the rows being removed, I think that's fine. I think that's happened with me for other visualizations before.
+* Concerning the ed attainment, I'm getting a thing that "educ_total" doesn't exist...so I'm not sure what's happening here
+
+
 ```{r}
 
 # Median household income, continuous
@@ -473,63 +508,101 @@ dc_train |>
 
 ```
 
-## DC Temperature Map
-
-Stephanie 12/11 - We'll have to change the bottom code due to using different temperature data
-MA 12/12 - Created new map using landcover 'uhi' variable for temperature, but only using 'landcover' as a dataset - need to figure out how to make 'dc_full_data' work
+## Exploring temperature in relation to other variables
 
 JAME 12/12 - I fixed this - I guess we have to left_join with the sf df in the first position in left_join(), so that we join the non-sf df onto the sf df and it stays sf. BUT do we have to st_transform() since the crs is not 4326?
 
-```{r}
+STEPHANIE 12/13 - It doesn't matter that the CRS isn't 4326 for mapping purposes - the main concern with CRS is that it has to be the same between two spatial datasets if you're going to do something like join the two. I'm also realizing that we probably shouldn't do a map here because this map shows which block groups are in the training data (vs. the testing data) since you can see which block groups are excluded from the map...so this may be a form of data leakage. I'm going to mute this code block and instead think of another way we can show UHI in relation to other variables.
 
-dc_train |> ggplot() +
-  geom_sf(
-    mapping = aes(fill = uhi),
-    color = "white"
-    ) +
-    scale_fill_gradient(
-    low = "#f7ef9d",
-    high = "#be2b25"
-    ) +
-  labs(
-    title = "Average evening temperature, 2018",
-    fill = "Temperature (degrees F)"
-  ) +
-  theme_void()
+
+```{r}
+# Muting as per my comment above (Stephanie)
+
+#dc_train |> ggplot() +
+#  geom_sf(
+#    mapping = aes(fill = uhi),
+#    color = "white"
+#    ) +
+#    scale_fill_gradient(
+#    low = "#f7ef9d",
+#    high = "#be2b25"
+#    ) +
+#  labs(
+#    title = "Average evening temperature, 2018",
+#    fill = "Temperature (degrees F)"
+#  ) +
+#  theme_void()
 
 ```
+
+Temperature & population:
+```{r}
+
+# Total population
+dc_train |>
+  ggplot(aes(x = total_pop, y = uhi, color = hotspot)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal()
+
+# Population density
+dc_train |>
+  ggplot(aes(x = pop_dens_sq_mi, y = uhi, color = hotspot)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal()
+
+# Non-white population density
+dc_train |>
+  ggplot(aes(x = race_poc_ratio, y = uhi, color = hotspot)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal()
+
+```
+
+Temperature & income/education
+```{r}
+
+# Median household income
+dc_train |>
+  ggplot(aes(x = med_hhi, y = uhi, color = hotspot)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal()
+
+# Ratio of bachelors degrees
+dc_train |>
+  ggplot(aes(x = ed_bach_ratio, y = uhi, color = hotspot)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal()
+
+
+```
+
+Temperature & landcover
+```{r}
+
+# Comparing with percentage of non-canopy vegetation
+dc_train |>
+  ggplot(aes(x = veg_pct, y = uhi, color = hotspot)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal()
+
+# Comparing with percentage area of urban tree canopy
+dc_train |>
+  ggplot(aes(x = utc_pct, y = uhi, color = hotspot)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal()
+
+# Comparing with percentage area of impervious surfaces (e.g., roads, parking lots, etc.)
+dc_train |>
+  ggplot(aes(x = to_ia_pct, y = uhi, color = hotspot)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal()
+
+
+```
+
+STEPHANIE 12/13 - The graphs that compare UHI with percentage area of urban tree canopy and of impervious surfaces seems quite compelling. This makes sense, and it's intersting to notice how not a lot of the demographic stuff doesn't seem to show up in EDA but the landcover stuff seem like promising predictors.
 
 # Decision Tree
-
-## Decision Tree EDA
-
-Stephanie 12/11 - We'll have to change the bottom code due to using different temperature data
-Madeleine 12/12 - Updated this to work with UHI variable from landcover
-Deciding the threshold for hot vs. not hot:
-
-```{r}
-
-# visualizing a cumulative histogram of counts of UHI values
-dc_train |>
-  group_by(uhi) |>
-  ggplot(aes(uhi)) +
-  geom_histogram(aes(y = cumsum(..count..)))
-
-# calculating frequency & cumulative frequency
-heat_freq <- dc_train |>
-  count(uhi)
-
-heat_freq$cumulative <- cumsum(heat_freq$n)
-
-heat_freq |>
-  filter(
-    cumulative >= 285,
-    cumulative <= 286) |>
-  head()
-
-```
-
-JAMIE 12/12 - I added back uhi here bc we need for the lm and rf models. I added a step_rm with uhi to the decision tree model instead.
 
 ## Decision Tree Modeling
 
