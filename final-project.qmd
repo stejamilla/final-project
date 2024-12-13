@@ -777,9 +777,10 @@ dc_recipe <- recipe(formula = uhi ~ ., data = dc_train) |>
 
 ```
 
+## Modelling
+
 ```{r}
 
-# Model 2 - linear regression
 dc_lm_model <- 
   linear_reg() |>
   set_mode(mode = "regression") |>
@@ -888,13 +889,6 @@ rf_resamples |>
   ggplot(mapping = aes(x = id, y = .estimate, group = .metric)) +
   geom_point() +
   geom_line()
-
-```
-
-## Data Visualization
-```{r}
-
-
 
 ```
 
