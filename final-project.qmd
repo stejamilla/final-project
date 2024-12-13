@@ -347,6 +347,7 @@ New 50% threshold (UHI data from landcover; C to F conversion) is 90.1.
 STEPHANIE 12/13
 Did we want to go with 25% for hotspot vs 75%? I'm fine to change the threshold, we'll just have to justify which level to go for.
 
+Also, here's the data that has missing values (as per a warning message from random forests) - Missing data in columns: race_white_ratio, race_ai_an_ratio, race_asian_ratio, race_oth_mult_ratio, ed_hsd_ratio, ed_bach_ratio, ed_adv_ratio, med_hhi, med_prop_val, med_rent_pct_inc, hous_units_per_person, vac_units_share, inc_home_val_ratio.
 
 ```{r}
 
@@ -446,19 +447,6 @@ dc_train <- training(x = dc_split)
 dc_test <- testing(x = dc_split)
 
 ```
-
-JAMIE 12/12 - Do we want folds? added here. Not using folds does not make the lm rank deficient model warning go away.
-STEPHANIE 12/13 - I think yes, we'll have to use it, especially for hyper parameter tuning.
-
-```{r}
-
-# V-fold cross validation with 10 folds
-dc_folds <- vfold_cv(data = dc_train, v = 10)
-
-```
-
-JAMIE 12/12 - Since we can only do EDA on the training data - I moved the maps and vizs down here and changed the dfs to the training one!
-STEPHANIE 12/13 - Sounds good
 
 # Initial EDA
 
@@ -612,7 +600,7 @@ STEPHANIE 12/13 - I added "-tract" and "-ward" to remove more geographic indicat
 # Prep the dataset for modelling
 dc_train <- dc_train |>
   st_drop_geometry() |>
-  select(-block_group, -intptlat, -intptlon, -gis_id, -globalid, gid, -tract, -ward) 
+  select(-block_group, -intptlat, -intptlon, -gis_id, -globalid, gid, -tract, -ward, -block_group_temp) 
 
 ```
 
@@ -707,67 +695,85 @@ planting_map + building_map + lot_map
 
 # Linear Regression
 
+JAMIE 12/12 - Do we want folds? added here. Not using folds does not make the lm rank deficient model warning go away.
+STEPHANIE 12/13 - I think yes, we'll have to use it, especially for hyper parameter tuning. My main issue with folding at this point is that I think we need to remove all the variables we don't want from dc_train first and then get do folding so that the folding process doesn't take them into account. So I think we should take out the variables from dc_train before the lm and rf models (using select rather than step_rm) and then do the folding.
+
+```{r}
+
+# Editing dc_train data for the sake of folding & hyperparameter tuning
+dc_train <- dc_train |>
+  select(
+    # remove raw total pop var (custom pop density and other pop proportion
+    # vars remain)
+    -total_pop,
+    # remove raw race vars (custom proportion vars remain)
+    -race_white,
+    -race_black,
+    -race_ai_an,
+    -race_asian,
+    -race_nh_pi,
+    -race_oth_mult,
+    -race_eth_hisp,
+    # remove raw ed vars (custom proportion vars remain)
+    -ed_doct,
+    -ed_prof_deg,
+    -ed_master,
+    -ed_bach,
+    -ed_assoc,
+    -ed_reg_hsd,
+    -ed_ged,
+    -ed_comb_hsd,
+    -ed_comb_adv_deg,
+    # remove duplicative housing data (custom proportion vars and pct var
+    # remain)
+    -total_hous_units,
+    -occ_units,
+    -vac_units,
+    -med_gross_rent,
+    # remove duplicative land data (custom proportion / "pct" vars remain)
+    -ends_with("_ac"),
+    -total_sq_mi,
+    -water_sq_mi,
+    -wtr_pct,
+    -aland,
+    -awater,
+    -utcac0620,
+    -utcac1120,
+    -utcac1520,
+    -utcpct0620,
+    -utcpct1120,
+    -utc_pct_06,
+    -utc_pct_11,
+    -utc_pct_15,
+    # remove duplicative hotspot
+    -hotspot,
+    # remove pop_density_water_sq_mi due to INF value for most records 
+    -pop_density_water_sq_mi)
+
+# V-fold cross validation with 10 folds
+dc_folds <- vfold_cv(data = dc_train, v = 10)
+
+```
+
+
 JAMIE 12/12 - Added recipe for lm and rf and added lm model and fit below. Having trouble with this major warning:
 A | warning: prediction from rank-deficient fit; consider predict(., rankdeficient="NA")
 Also, I experimented here with removing all the columns that seemed duplicative. I did not add this to the dt recipe for now. Let me know what you all think of removing these.
 
 STEPHANIE 12/13 - The main issue are the columns that have NA values. We need to decide if we should remove those or if it's possible for us to do data imputation aka decide what those values should be.
+I removed the identifying factor variables becuase I had to remove them earlier from dc_train.
 
 ```{r}
 
 # Create recipe for use in linear regression and random forest models
 # Create the recipe
 dc_recipe <- recipe(formula = uhi ~ ., data = dc_train) |>
-  step_rm(
-    # remove identifying factors
-    block_group_temp,
-    tract,
-    # remove raw total pop var (custom pop density and other pop proportion
-    # vars remain)
-    total_pop,
-    # remove raw race vars (custom proportion vars remain)
-    race_white,
-    race_black,
-    race_ai_an,
-    race_asian,
-    race_nh_pi,
-    race_oth_mult,
-    race_eth_hisp,
-    # remove raw ed vars (custom proportion vars remain)
-    ed_doct,
-    ed_prof_deg,
-    ed_master,
-    ed_bach,
-    ed_assoc,
-    ed_reg_hsd,
-    ed_ged,
-    ed_comb_hsd,
-    ed_comb_adv_deg,
-    # remove duplicative housing data (custom proportion vars and pct var
-    # remain)
-    total_hous_units,
-    occ_units,
-    vac_units,
-    med_gross_rent,
-    # remove duplicative land data (custom proportion / "pct" vars remain)
-    ends_with("_ac"),
-    total_sq_mi,
-    water_sq_mi,
-    wtr_pct,
-    aland,
-    awater,
-    utcac0620,
-    utcac1120,
-    utcac1520,
-    utcpct0620,
-    utcpct1120,
-    utc_pct_06,
-    utc_pct_11,
-    utc_pct_15,
-    # remove duplicative hotspot
-    hotspot,
-    # remove pop_density_water_sq_mi due to INF value for most records 
-    pop_density_water_sq_mi)
+  # Removing predictors that have near zero variability
+  step_nzv(all_predictors()) |>
+  # Removing predictors that are highly correlated with others
+  step_corr(all_predictors())
+
+  
 
 ```
 
@@ -799,11 +805,14 @@ dc_lm_fit <-
 
 # Random Forests
 
-JAMIE 12/12 - I do not really know what numbers to put for things like trees and grid etc at the moment...just putting in what I used for the homework from class examples, for us to update later...
+## Modelling 
+
+### Hyperparameter Tuning
+
+STEPHANIE 12/13
 
 ```{r}
 
-# Model 3 - random forest
 dc_rf_model <- 
   rand_forest(
   trees = 200,
@@ -827,14 +836,65 @@ dc_rf_workflow <-
   add_recipe(dc_recipe) |>
   add_model(dc_rf_model)
 
-# Fit the random forest workflow
-dc_rf_fit <-
-  dc_rf_workflow |>
-  tune_grid(
-    resamples = dc_folds,
-    grid = dc_rf_grid,
-    metrics = metric_set(rmse),
-    control = control_grid(save_workflow = TRUE))
+# Creating a grid to show results of hyper parameter tuning
+dc_rf_grid <- grid_regular(
+  mtry(range = c(1, 15)),
+  min_n(range = c(1, 15)),
+  levels = 5
+)
+
+# Tuning the grid
+rf_resamples <- tune_grid(
+  dc_rf_workflow,
+  resamples = dc_folds,
+  grid = dc_rf_grid
+)
+
+# Showing the best hyperparameters
+show_best(rf_resamples)
+
+```
+
+### Implementing best hyperparameters based on tuning
+
+```{r}
+
+# Filling in hyperparameters based on tuning
+dc_rf_model <- rand_forest(
+  trees = 200,
+  mtry = #fill in based on the best resample,
+  min_n = #fill in based on the best resample
+) |>
+  set_mode(mode = "regression") |>
+  set_engine(
+    engine = "ranger", 
+    importance = "impurity",
+    num.threads = 4
+  )
+
+# Random forest workflow
+dc_rf_workflow <- 
+  workflow() |>
+  add_recipe(dc_recipe) |>
+  add_model(dc_rf_model)
+
+rf_resamples <- dc_rf_workflow |>
+  fit_resamples(resamples = dc_folds)
+
+rf_resamples |>
+  collect_metrics(summarize = FALSE) |>
+  filter(.metric == "rmse") |>
+  print() |>
+  ggplot(mapping = aes(x = id, y = .estimate, group = .metric)) +
+  geom_point() +
+  geom_line()
+
+```
+
+## Data Visualization
+```{r}
+
+
 
 ```
 
