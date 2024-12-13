@@ -15,11 +15,11 @@ urlcolor: blue
 toc: true
 ---
 
-## About This Project
+# About This Project
 Climate Central's UHI index values (in °F) are "estimates of how much the urban built environment boosts temperatures. In other words, the UHI index is an estimate of the additional heat that local land use factors contribute to urban areas."
 Stephanie 12/10 - We'll need to change the above blurb based on what temperature data we use
 
-## Setup
+# Setup
 
 Loading packages:
 ```{r}
@@ -53,10 +53,10 @@ options(scipen = 999)
 
 JAMIE 12/12: I took out our removal of all vars containing "_ac" because I needed these land variables for the metrics - we can remove them later below.
 
+Loading data from Open Data DC:
 ```{r}
 
-# Read in Urban Tree Canopy by Census Block Group (2020) data from Open Data DC
-# and clean up
+# Loading Urban Tree Canopy by Census Block Group (2020) data
 landcover <- read_sf(paste0("data/Urban_Tree_Canopy",
                             "_by_Census_Block_Group_in_2020.shp")) |>
   rename(block_group = GEOID) |>
@@ -67,11 +67,17 @@ landcover <- read_sf(paste0("data/Urban_Tree_Canopy",
   # Converting UHI to Fahrenheit
   mutate(uhi = (uhi*(9/5) + 32))
 
+# Loading DC Ward data from Urban Tree Canopy by Ward (2020)
+wards <- read_sf("data/Urban_Tree_Canopy_by_Ward_in_2020.shp") |>
+  rename_all(tolower) |>
+  select(ward) |>
+  st_transform(crs = st_crs(landcover))
+
 ```
 
+Create key with Urban Tree Canopy data column descriptions and clean up:
 ```{r}
 
-# Create key with Urban Tree Canopy data column descriptions and clean up
 landcover_key <- read_csv("data/Urban_Tree_Canopy_Descriptions.csv",
                           col_names = FALSE) |>
   mutate(X1 = str_remove_all(X1, "\\( type:.*alias:|, length:.*| \\)")) |>
@@ -83,11 +89,27 @@ landcover_key <- read_csv("data/Urban_Tree_Canopy_Descriptions.csv",
 
 ```
 
-## Exploring Census Demographic Data
-
+Categorizing each block group into their respective ward:
 ```{r}
 
-# Load ACS 5-yr 2016-2020 data
+# Spatial join so that each block group is assigned a ward based on majority area of a block group
+# within a ward
+landcover <- st_join(landcover, wards, largest = TRUE)
+
+# Mapping the overlapping wards & block groups
+ggplot() +
+  geom_sf(data = landcover,
+          aes(fill = ward))
+  
+
+```
+STEPHANIE 12/13 - this code says that if a ward intersects with a blockgroup, then classify that block group as a ward. For block groups that overlap multiple wards, it returns the ward that the block group overlaps with the most area (that's the argument largest = TRUE)
+
+## Exploring Census Demographic Data
+
+Load ACS 5-yr 2016-2020 variables:
+```{r}
+
 acs_variables <- load_variables(2020, "acs5") |>
   filter(geography == "block group")
 
@@ -113,8 +135,9 @@ JAMIE 12/12 - Here too, normally this total line is just the sum of all individu
 
 * It occurs to me we may need to choose baseline categories for any categorical variables we include and leave those out? Not sure if that is only a requirement for line and linear regression?
 JAMIE 12/12 - Good point! I'm adding stuff in below without factoring that in for now, but I think we def need to determine if we need to deal with this!
+STEPHANIE 12/13 - I'm not too concerned about this because we've never had to address categorical variables in the assignments. We can do something like "step_dummy()" if we want to recode a categorical variable into a dummy instead.
 
-## Loading Census demographic data via API
+### Loading Census demographic data via API
 
 JAMIE 12/12 - Unfortunately I think we have to code -66666s as NAs. See here: http://bit.ly/3DnlfIh
 "-666666666: The estimate could not be computed because there were an insufficient number of sample observations...For a 5-year median estimate, the margin of error associated with a median was larger than the median itself." I'm going to take out the code turning them to 0s and put in my code converting them to NAs - let me know if you guys disagree. This starts to get into the MOE issues Professor Williams was talking about...could become a problem...
@@ -284,7 +307,7 @@ acs_data <- acs_data |>
 
 ```
 
-## Stitching Together Final Dataset
+# Creating the Final Dataset for Analysis
 
 JAMIE 12/12: Note I changed the name of the main df we are using pre-split to "dc_full_data." ALSO note that I moved the hotspot / not hotspot var to the below code chunk to streamline data cleanup.
 
@@ -372,11 +395,15 @@ dc_full_data <- left_join(landcover, acs_data, by = "block_group") |>
 
 ```
 
-### Prepare the data for analysis
+## Prepare the data for analysis (set seed & splitting)
 
 JAMIE 12/12 - Changed the var names so that these are the splits we use for all models, not just decision tree
 
 * Do we need an implementation set too?
+
+STEPHANIE 12/13 - Aaron mentioned that we should make sure that when we split the data, that we should stratify the data by some geographic feature so that for example not all the block groups in a certain ward are only in the training data. Because then our model would only really work for that ward. Thus, the argument strata = ward.
+* Concerning implementation data, I worry that since we only have a set of n = 571 that taking out a number would significantly affect our model. Maybe we can just do a set of 10 data points for the implementation data like we did in Assignment 7, but we'd have to randomize which ten are taken out (which we didn't do in assignment 7, we sliced the data by where observations were located in the dataset)
+
 
 ```{r}
 
@@ -384,7 +411,7 @@ JAMIE 12/12 - Changed the var names so that these are the splits we use for all 
 set.seed(20241202)
 
 # Split sample and create training and testing datasets
-dc_split <- initial_split(data = dc_full_data, prop = 0.8)
+dc_split <- initial_split(data = dc_full_data, strata = ward, prop = 0.8)
 dc_train <- training(x = dc_split) 
 dc_test <- testing(x = dc_split)
 
@@ -401,9 +428,9 @@ dc_folds <- vfold_cv(data = dc_train, v = 10)
 
 JAMIE 12/12 - Since we can only do EDA on the training data - I moved the maps and vizs down here and changed the dfs to the training one!
 
-## Initial EDA
+# Initial EDA
 
-### Review summary statistics
+## Review summary statistics
 
 JAMIE 12/12 - Added summary stats table here
 
@@ -423,7 +450,7 @@ kable(dc_train_summary <- as_tibble(dc_train |>
 
 ```
 
-### Exploration of some of the continuous variables
+## Exploration of some of the continuous variables
 
 JAMIE 12/12 - when we run the below viz we have a warning message that 56 rows were removed.
 
@@ -446,7 +473,7 @@ dc_train |>
 
 ```
 
-### DC Temperature Map
+## DC Temperature Map
 
 Stephanie 12/11 - We'll have to change the bottom code due to using different temperature data
 MA 12/12 - Created new map using landcover 'uhi' variable for temperature, but only using 'landcover' as a dataset - need to figure out how to make 'dc_full_data' work
@@ -472,7 +499,9 @@ dc_train |> ggplot() +
 
 ```
 
-### Decision Tree EDA
+# Decision Tree
+
+## Decision Tree EDA
 
 Stephanie 12/11 - We'll have to change the bottom code due to using different temperature data
 Madeleine 12/12 - Updated this to work with UHI variable from landcover
@@ -502,6 +531,8 @@ heat_freq |>
 
 JAMIE 12/12 - I added back uhi here bc we need for the lm and rf models. I added a step_rm with uhi to the decision tree model instead.
 
+## Decision Tree Modeling
+
 ```{r}
 
 # Prep the dataset for modeling
@@ -515,7 +546,7 @@ dc_train <- dc_train |>
 JAMIE 12/12 - Changing the dataset used in the recipe to dt_train rather than the full df
 * In the recipe for the lm and rf models, I included a lot of variables in step_rm. Wanted to get your thoughts on these before I added them here too...Just removed uhi and pop_density_water_sq_mi for now.
 
-## Decision Tree
+
 ```{r}
 
 dt_recipe <- recipe(formula = hotspot ~ ., data = dc_train) |>
@@ -543,7 +574,7 @@ rpart.plot::rpart.plot(x = dt_fitting$fit$fit$fit,
 
 ```
 
-## Linear Regression
+# Linear Regression
 
 JAMIE 12/12 - Added recipe for lm and rf and added lm model and fit below. Having trouble with this major warning:
 A | warning: prediction from rank-deficient fit; consider predict(., rankdeficient="NA")
@@ -633,7 +664,7 @@ dc_lm_fit <-
 
 ```
 
-## Random Forests
+# Random Forests
 
 JAMIE 12/12 - I do not really know what numbers to put for things like trees and grid etc at the moment...just putting in what I used for the homework from class examples, for us to update later...
 
@@ -674,7 +705,8 @@ dc_rf_fit <-
 
 ```
 
-#### Plot the RMSEs across each fit:
+# Comparing Models
+## Plot the RMSEs across each fit:
 
 JAMIE 12/12 - Below is what I used in the assignment 07 hw to pull the metrics in the end, so pasted here and updated a bit. It renders!
 
@@ -735,7 +767,7 @@ kable(avg_rmse <- tibble(
 
 ```
 
-### Estimate the out-of-sample error rate
+## Estimate the out-of-sample error rate
 
 JAMIE 12/13 - Added metrics work below
 
@@ -760,7 +792,7 @@ kable(rmse(actual = test_predictions$y, predicted = test_predictions$y_hat))
 ```
 
 
-## Sources
+# Sources
 
 https://www.climatecentral.org/climate-matters/urban-heat-islands-2024
 
