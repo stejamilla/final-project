@@ -343,7 +343,7 @@ dc_full_data <- left_join(landcover, acs_data, by = "block_group") |>
     # creating hotspot var for decision tree model
     hotspot = if_else(uhi <= 90.1, "hotspot", "not hotspot"),
     # remove factor from uhi var
-    uhi = as.numeric(levels(uhi))[uhi]) |>
+    uhi = as.numeric(as.character(uhi))) |>
   relocate(c("block_group_temp", "tract"), .after = 2) |>
   # remove columns with only one unique value
   select(-objectid,
@@ -419,7 +419,9 @@ kable(dc_train_summary <- as_tibble(dc_train |>
 
 ### Exploration of some of the continuous variables
 
-JAMIE 12/12 - Flag that we have a warning message that 56 rows were removed in below viz - just flagging for now.
+JAMIE 12/12 - when we run the below viz we have a warning message that 56 rows were removed.
+
+* I silenced the total ed attainment ggplot per by above note.
 
 ```{r}
 
@@ -470,8 +472,6 @@ Stephanie 12/11 - We'll have to change the bottom code due to using different te
 Madeleine 12/12 - Updated this to work with UHI variable from landcover
 Deciding the threshold for hot vs. not hot:
 
-JAMIE 12/12 - Now getting an error below in cumulative... Do the cumulative numbers need to change since this is training data only?
-
 ```{r}
 
 # visualizing a cumulative histogram of counts of UHI values
@@ -482,8 +482,9 @@ dc_train |>
 
 # calculating frequency & cumulative frequency
 heat_freq <- dc_train |>
-  count(uhi) |>
-  mutate(cumulative = cumsum(heat_freq$n))
+  count(uhi)
+
+heat_freq$cumulative <- cumsum(heat_freq$n)
 
 heat_freq |>
   filter(
