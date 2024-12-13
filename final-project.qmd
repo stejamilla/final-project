@@ -49,7 +49,7 @@ options(scipen = 999)
 
 ## Cleaning DC Land Cover Data
 
-JAMIE 12/12: I took out our removal of all vars containing "_ac" because I needed these land variables for the metrics - will remove them later below.
+JAMIE 12/12: I took out our removal of all vars containing "_ac" because I needed these land variables for the metrics - we can remove them later below.
 
 ```{r}
 
@@ -248,46 +248,46 @@ acs_data <- acs_data |>
                              block_group_temp,
                              sep = "")) |>
   rename_all(tolower) |>
-  relocate(block_group, .before = name) |>
+  relocate(block_group, .before = name)
+
+```
+
+```{r}
+
+# Review frequency of ACS error coding (http://bit.ly/3DnlfIh)
+kable(acs_codes_summary <- acs_data |>
+  select(total_pop:med_rent_pct_inc) |>
+  summarise(across(everything(), list(
+    `sum-666666666` = ~sum(. == "-666666666", na.rm=T),
+    `sum-999999999` = ~sum(. == "-999999999", na.rm=T),
+    `sum-888888888` = ~sum(. == "-888888888", na.rm=T),
+    `sum-222222222` = ~sum(. == "-222222222", na.rm=T),
+    `sum-333333333` = ~sum(. == "-333333333", na.rm=T),
+    `sum-555555555` = ~sum(. == "-555555555", na.rm=T),
+    `sum*` = ~sum(. == "*", na.rm=T),
+    `sumnull` = ~sum(. == "null", na.rm=T)))) |>
+  pivot_longer(cols = everything(), 
+               names_to = c("colNames", ".value"),
+               names_sep="_sum") |>
+  filter(rowSums(across(where(is.numeric)))>0))
+
+# Redefine coded values
+# Create list of codes in character format
+acs_codes_char <- c("-666666666",
+                   "-999999999",
+                   "-888888888",
+                   "-222222222",
+                   "-333333333",
+                   "-555555555",
+                   "*",
+                   "null")
+
+# Replace the codes with NA
+acs_data <- acs_data |> 
+  mutate(across(where(is.character), 
+                ~if_else(. %in% acs_codes_char, NA_character_, .))) |>
+  # convert all to numeric |>
   mutate_at(vars(total_pop:med_rent_pct_inc), as.numeric)
-
-# Review vars for topline view and error coding
-kable(acs_data_summary <- as_tibble(acs_data |>
-  select(where(is.numeric)) |>
-  lapply(summary)) |>
-  mutate(measure = c("Min", "Q1", "Median", "Mean", "Q3", "Max")) |>
-  mutate(across(everything(), as.vector)) |>
-  pivot_longer(-measure) |>
-  pivot_wider(id_cols = "name",
-              names_from = "measure",
-              values_from = "value"))
-
-# NOTE ACS error coding: "The estimate could not be computed because there were
-# an insufficient number of sample observations. For a ratio of medians
-# estimate, one or both of the median estimates falls in the lowest interval or
-# highest interval of an open-ended distribution. The estimate could not be
-# computed because there were an insufficient number of sample observations.
-# For a ratio of medians estimate, one or both of the median estimates falls in
-# the lowest interval or highest interval of an open-ended distribution. For a
-# 5-year median estimate, the margin of error associated with a median was
-# larger than the median itself." (http://bit.ly/3DnlfIh)
-acs_data <- acs_data |>
-  mutate(med_hhi = if_else(med_hhi == -666666666, NA, med_hhi),
-         med_prop_val = if_else(med_prop_val == -666666666, NA, med_prop_val),
-         med_gross_rent = if_else(med_gross_rent == -666666666, NA, med_gross_rent),
-         med_rent_pct_inc = if_else(med_rent_pct_inc == -666666666, NA, med_rent_pct_inc))
-
-# Rerun summary measures
-kable(acs_data_summary <- as_tibble(acs_data |>
-                                      select(where(is.numeric)) |>
-                                      lapply(summary) |>
-                                      lapply(`length<-`, 6)) |>
-        mutate(measure = c("Min", "Q1", "Median", "Mean", "Q3", "Max")) |>
-        mutate(across(everything(), as.vector)) |>
-        pivot_longer(-measure) |>
-        pivot_wider(id_cols = "name",
-                    names_from = "measure",
-                    values_from = "value"))
 
 ```
 
@@ -409,6 +409,24 @@ dc_folds <- vfold_cv(data = dc_train, v = 10)
 JAMIE 12/12 - Since we can only do EDA on the training data - I moved the maps and vizs down here and changed the dfs to the training one!
 
 ## Initial EDA
+
+### Review summary statistics
+
+```{r}
+
+# Review summary statistics
+kable(dc_train_summary <- as_tibble(dc_train |>
+                                      select(where(is.numeric)) |>
+                                      lapply(summary) |>
+                                      lapply(`length<-`, 6)) |>
+        mutate(measure = c("Min", "Q1", "Median", "Mean", "Q3", "Max")) |>
+        mutate(across(everything(), as.vector)) |>
+        pivot_longer(-measure) |>
+        pivot_wider(id_cols = "name",
+                    names_from = "measure",
+                    values_from = "value"))
+
+```
 
 ### Exploration of some of the continuous variables
 
