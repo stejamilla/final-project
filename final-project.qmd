@@ -604,14 +604,14 @@ STEPHANIE 12/13 - The graphs that compare UHI with percentage area of urban tree
 
 # Decision Tree
 
-## Decision Tree Modeling
+STEPHANIE 12/13 - I added "-tract" and "-ward" to remove more geographic indicators that likely would affect the model, since that otherwise would've been a main predictor of a hotspot
 
 ```{r}
 
 # Prep the dataset for modeling
 dc_train <- dc_train |>
   st_drop_geometry() |>
-  select(-block_group, -intptlat, -intptlon, -gis_id, -globalid, gid) 
+  select(-block_group, -intptlat, -intptlon, -gis_id, -globalid, gid, -tract, -ward) 
 
 ```
 
@@ -619,6 +619,7 @@ dc_train <- dc_train |>
 JAMIE 12/12 - Changing the dataset used in the recipe to dt_train rather than the full df
 * In the recipe for the lm and rf models, I included a lot of variables in step_rm. Wanted to get your thoughts on these before I added them here too...Just removed uhi and pop_density_water_sq_mi for now.
 
+STEPHANIE 12/13 - I think what you removed here is fine. I've decided to keep in downsampling because I think it's useful. For reference, down-sampling "randomly subset all the classes in the training set so that their class frequencies match the least prevalent class. For example, suppose that 80% of the training set samples are the first class and the remaining 20% are in the second class. Down-sampling would randomly sample the first class to be the same size as the second class (so that only 40% of the total training set is used to fit the model)."
 
 ```{r}
 
@@ -628,7 +629,7 @@ dt_recipe <- recipe(formula = hotspot ~ ., data = dc_train) |>
     uhi,
     # remove pop_density_water_sq_mi due to inf value for most records 
     pop_density_water_sq_mi) |>
-  themis::step_downsample(hotspot) |> #I don't know if we need this or not...
+  themis::step_downsample(hotspot) |> 
   step_nzv(all_numeric_predictors())
 
 dt_model <- decision_tree() |>
@@ -646,6 +647,10 @@ rpart.plot::rpart.plot(x = dt_fitting$fit$fit$fit,
                        roundint = FALSE)
 
 ```
+STEPHANIE 12/13 - 
+I think we have an interesting model. The first decision point is whether the percentage of the block group that's unsuitable for planting; if it's lower than 44% then it's not a hotspot. If it is greater than or equal to 44%, then you check if it's greater than or equal to 55%; if it is then it's a hotspot. If it's not then you check if the total acre area of buildings, and if it's less than 6.4 acres, then it's not a hotspot. If it is, then you check the percentage of area that's a parking lot. If it's greater than or equal to 1.6%, then it's a hotspot. 
+
+Notably there's no demographic indicators here, it's all land cover based. Part of me wonders if we should take out the total area (_ac) variables, but I think it's kinda interesting keeping it in. I wonder why total area became a decision branch rather than the percentage version.
 
 # Linear Regression
 
