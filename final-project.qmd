@@ -65,18 +65,6 @@ landcover <- read_sf(paste0("data/Urban_Tree_Canopy",
   # Converting UHI to Fahrenheit
   mutate(uhi = (uhi*(9/5) + 32))
 
-# Review vars for topline view and error coding
-kable(landcover_summary <- as_tibble(landcover |>
-                                       select(where(is.numeric)) |>
-                                       st_drop_geometry() |>
-                                       lapply(summary)) |>
-        mutate(measure = c("Min", "Q1", "Median", "Mean", "Q3", "Max")) |>
-        mutate(across(everything(), as.vector)) |>
-        pivot_longer(-measure) |>
-        pivot_wider(id_cols = "name",
-                    names_from = "measure",
-                    values_from = "value"))
-
 ```
 
 ```{r}
