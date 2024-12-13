@@ -436,7 +436,7 @@ dc_train |>
 Stephanie 12/11 - We'll have to change the bottom code due to using different temperature data
 MA 12/12 - Created new map using landcover 'uhi' variable for temperature, but only using 'landcover' as a dataset - need to figure out how to make 'dc_full_data' work
 
-JAME 12/12 - I fixed this - I guess we have to left_join with the sf df in the first position in left_join(), so that we join the non-sf df onto the sf df and it stays sf. BUT do we have to st_transform() since the crs is not 4326? Also, when I move the code to remove uhi BEFORE we do the training set, that means we can't run this map. Can we remove uhi afterward?
+JAME 12/12 - I fixed this - I guess we have to left_join with the sf df in the first position in left_join(), so that we join the non-sf df onto the sf df and it stays sf. BUT do we have to st_transform() since the crs is not 4326?
 
 ```{r}
 
@@ -463,7 +463,7 @@ Stephanie 12/11 - We'll have to change the bottom code due to using different te
 Madeleine 12/12 - Updated this to work with UHI variable from landcover
 Deciding the threshold for hot vs. not hot:
 
-JAMIE 12/12 - Now getting an error regarding the number of datapoints in cumulative...will have another look tomorrow. Do the numbers need to change since this is training data only?
+JAMIE 12/12 - Now getting an error below in cumulative... Do the cumulative numbers need to change since this is training data only?
 
 ```{r}
 
@@ -530,7 +530,7 @@ rpart.plot::rpart.plot(x = dt_fitting$fit$fit$fit,
 
 ## Linear Regression
 
-# Having trouble with a factor error below that is over my head...will continue to work on it...
+# Having trouble with a factor error below...
 https://stackoverflow.com/questions/44200195/how-to-debug-contrasts-can-be-applied-only-to-factors-with-2-or-more-levels-er
 
 ```{r}
@@ -564,9 +564,9 @@ dc_lm_fit <-
 
 ## Random Forests
 
-JAMIE 12/12 - I do not really know what numbers to put for things like trees etc at the moment...just putting in what I used for the homework from class examples, for us to update later!
+JAMIE 12/12 - I do not really know what numbers to put for things like trees and grid etc at the moment...just putting in what I used for the homework from class examples, for us to update later...
 
-* another error here I need to work through...
+* And another error here...I'm worried it's because of NAs.
 
 ```{r}
 
@@ -606,6 +606,8 @@ dc_rf_fit <-
 ```
 
 #### Plot the RMSEs across each fit:
+
+JAMIE 12/12 - Below is what I used in the assignment 07 hw to pull the metrics in the end, so pasted here and updated a bit. Can't tell if it works until the models themselves can run...
 
 ```{r}
 
@@ -649,7 +651,7 @@ fit_comps <- bind_rows(lm, rf)
 fit_comps |>
   ggplot(mapping = aes(x = model, y = rmse)) +
   geom_point() +
-  labs(title = "RMSE of Linear Regression and Random Forest Models",
+  labs(title = "RMSE of Linear Regression and Random Forest Models\n",
        subtitle = paste0("Prediction Model Evaluation for Washington, DC\n",
                          "Urban Heat Index (UHI)"),
        x = "Prediction Model",
@@ -675,11 +677,11 @@ best_lm_fit <- fit_best(dc_lm_fit, verbose = TRUE)
 
 # make predictions using best fit
 test_predictions <-
-  dc_modeling_test |>
+  dc_test |>
   select(uhi) |>
   rename(y = uhi) |>
   mutate(y = as.numeric(y)) |>
-  mutate(y_hat = as.numeric(as_vector(predict(best_lm_fit, dc_modeling_test))))
+  mutate(y_hat = as.numeric(as_vector(predict(best_lm_fit, dc_test))))
 
 # collect rf metrics
 kable(rmse(actual = test_predictions$y, predicted = test_predictions$y_hat))
