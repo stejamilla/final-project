@@ -30,10 +30,12 @@ library(ggplot2)
 library(sf)
 library(tidycensus)
 library(stringr)
+library(magrittr)
 library(jsonlite)
 library(httr)
 library(tidymodels)
 library(knitr)
+library(kableExtra)
 library(data.table)
 
 # Clone the private github repository for this assignment using SSH link:
@@ -236,6 +238,8 @@ acs_data <- acs_data |>
   relocate(block_group, .before = name)
 
 ```
+
+Note below the issues with the acs error codes
 
 ```{r}
 
@@ -501,22 +505,23 @@ JAMIE 12/12 - I added back uhi here bc we need for the lm and rf models. I added
 # Prep the dataset for modeling
 dc_train <- dc_train |>
   st_drop_geometry() |>
-  # dropping uhi because that would be the main decision tree factor
-  select(-block_group, -intptlat, -intptlon) 
+  select(-block_group, -intptlat, -intptlon, -gis_id, -globalid, gid) 
 
 ```
 
 
-JAMIE 12/12 - Making a note that we need to do step_rm() here to remove:
-- The vars ending in "_ac" that we wanted to remove originally
-- vars that contain info that is duplicative of other vars (i know if we have month and full date, we'd have to remove one; do you think if we have a ratio metric, we have to remove the vars used in the ratio? I'm not clear on that.)
-* Also changing the dataset used in the recipe to dt_train rather than the full df
+JAMIE 12/12 - Changing the dataset used in the recipe to dt_train rather than the full df
+* In the recipe for the lm and rf models, I included a lot of variables in step_rm. Wanted to get your thoughts on these before I added them here too...Just removed uhi and pop_density_water_sq_mi for now.
 
 ## Decision Tree
 ```{r}
 
 dt_recipe <- recipe(formula = hotspot ~ ., data = dc_train) |>
-  step_rm(uhi) |>
+  step_rm(
+    # remove uhi var to avoid duplication of data from hotspot
+    uhi,
+    # remove pop_density_water_sq_mi due to inf value for most records 
+    pop_density_water_sq_mi) |>
   themis::step_downsample(hotspot) |> #I don't know if we need this or not...
   step_nzv(all_numeric_predictors())
 
@@ -538,13 +543,64 @@ rpart.plot::rpart.plot(x = dt_fitting$fit$fit$fit,
 
 ## Linear Regression
 
-# Having trouble with a factor error below...
-https://stackoverflow.com/questions/44200195/how-to-debug-contrasts-can-be-applied-only-to-factors-with-2-or-more-levels-er
+JAMIE 12/12 - Having trouble with this warning:
+A | warning: prediction from rank-deficient fit; consider predict(., rankdeficient="NA")
+Also, I experimented here with removing all the columns that seemed duplicative. I did not add this to the dt recipe for now. Let me know what you all think of removing these.
 
 ```{r}
 
 # Create the recipe
-dc_recipe <- recipe(formula = uhi ~ ., data = dc_train)
+dc_recipe <- recipe(formula = uhi ~ ., data = dc_train) |>
+  step_rm(
+    # remove identifying factors
+    block_group_temp,
+    tract,
+    # remove raw total pop var (custom pop density and other pop proportion
+    # vars remain)
+    total_pop,
+    # remove raw race vars (custom proportion vars remain)
+    race_white,
+    race_black,
+    race_ai_an,
+    race_asian,
+    race_nh_pi,
+    race_oth_mult,
+    race_eth_hisp,
+    # remove raw ed vars (custom proportion vars remain)
+    ed_doct,
+    ed_prof_deg,
+    ed_master,
+    ed_bach,
+    ed_assoc,
+    ed_reg_hsd,
+    ed_ged,
+    ed_comb_hsd,
+    ed_comb_adv_deg,
+    # remove duplicative housing data (custom proportion vars and pct var
+    # remain)
+    total_hous_units,
+    occ_units,
+    vac_units,
+    med_gross_rent,
+    # remove duplicative land data (custom proportion / "pct" vars remain)
+    ends_with("_ac"),
+    total_sq_mi,
+    water_sq_mi,
+    wtr_pct,
+    aland,
+    awater,
+    utcac0620,
+    utcac1120,
+    utcac1520,
+    utcpct0620,
+    utcpct1120,
+    utc_pct_06,
+    utc_pct_11,
+    utc_pct_15,
+    # remove duplicative hotspot
+    hotspot,
+    # remove pop_density_water_sq_mi due to INF value for most records 
+    pop_density_water_sq_mi)
 
 # Model 2 - linear regression
 dc_lm_model <- 
@@ -573,8 +629,6 @@ dc_lm_fit <-
 ## Random Forests
 
 JAMIE 12/12 - I do not really know what numbers to put for things like trees and grid etc at the moment...just putting in what I used for the homework from class examples, for us to update later...
-
-* And another error here...I'm worried it's because of NAs.
 
 ```{r}
 
