@@ -37,6 +37,7 @@ library(tidymodels)
 library(knitr)
 library(kableExtra)
 library(data.table)
+library(patchwork)
 
 # Clone the private github repository for this assignment using SSH link:
 # git@github.com:stejamilla/final-project.git
@@ -512,26 +513,25 @@ dc_train |>
 
 JAME 12/12 - I fixed this - I guess we have to left_join with the sf df in the first position in left_join(), so that we join the non-sf df onto the sf df and it stays sf. BUT do we have to st_transform() since the crs is not 4326?
 
-STEPHANIE 12/13 - It doesn't matter that the CRS isn't 4326 for mapping purposes - the main concern with CRS is that it has to be the same between two spatial datasets if you're going to do something like join the two. I'm also realizing that we probably shouldn't do a map here because this map shows which block groups are in the training data (vs. the testing data) since you can see which block groups are excluded from the map...so this may be a form of data leakage. I'm going to mute this code block and instead think of another way we can show UHI in relation to other variables.
-
+STEPHANIE 12/13 - It doesn't matter that the CRS isn't 4326 for mapping purposes - the main concern with CRS is that it has to be the same between two spatial datasets if you're going to do something like join the two. 
+I'm also realizing that we probably shouldn't do a map here with dc_train because this map shows which block groups are in the training data (vs. the testing data) since you can see which block groups are excluded from the map...so this may be a form of data leakage. I'm going to instead use the dc_full_data dataset.
 
 ```{r}
-# Muting as per my comment above (Stephanie)
 
-#dc_train |> ggplot() +
-#  geom_sf(
-#    mapping = aes(fill = uhi),
-#    color = "white"
-#    ) +
-#    scale_fill_gradient(
-#    low = "#f7ef9d",
-#    high = "#be2b25"
-#    ) +
-#  labs(
-#    title = "Average evening temperature, 2018",
-#    fill = "Temperature (degrees F)"
-#  ) +
-#  theme_void()
+dc_full_data |> ggplot() +
+  geom_sf(
+    mapping = aes(fill = uhi),
+    color = "#400001"
+    ) +
+    scale_fill_gradient(
+    low = "#f7ef9d",
+    high = "#be2b25"
+    ) +
+  labs(
+    title = "Average evening temperature, 2018",
+    fill = "Temperature (degrees F)"
+  ) +
+  theme_void()
 
 ```
 
@@ -604,11 +604,12 @@ STEPHANIE 12/13 - The graphs that compare UHI with percentage area of urban tree
 
 # Decision Tree
 
+## Modelling
 STEPHANIE 12/13 - I added "-tract" and "-ward" to remove more geographic indicators that likely would affect the model, since that otherwise would've been a main predictor of a hotspot
 
 ```{r}
 
-# Prep the dataset for modeling
+# Prep the dataset for modelling
 dc_train <- dc_train |>
   st_drop_geometry() |>
   select(-block_group, -intptlat, -intptlon, -gis_id, -globalid, gid, -tract, -ward) 
@@ -652,11 +653,65 @@ I think we have an interesting model. The first decision point is whether the pe
 
 Notably there's no demographic indicators here, it's all land cover based. Part of me wonders if we should take out the total area (_ac) variables, but I think it's kinda interesting keeping it in. I wonder why total area became a decision branch rather than the percentage version.
 
+## Visualizing Important Variables
+
+STEPHANIE 12/13 - Using dc_full_data as the dataset since it's possible we may accidentally do data leakage when mapping dc_train because we'll notice which block groups were excluded.
+
+```{r fig.width = 10, fig.height = 8}
+
+planting_map <- dc_full_data |> ggplot() +
+  geom_sf(aes(fill = to_un_pct)) +
+    scale_fill_gradient(
+    low = "#fcbc32",
+    high = "#4e974b"
+    ) +
+  theme_minimal() +
+  labs(
+    title = "Percentage of area suitable for planting (2020)",
+    subtitle = "by Block Group",
+    fill = "Percent Area",
+    caption = "Open Data DC"
+  )
+
+building_map <- dc_full_data |> ggplot() +
+  geom_sf(aes(fill = bld_ac)) +
+    scale_fill_gradient(
+    low = "#c4c8c0",
+    high = "#643424"
+    ) +
+  theme_minimal() +
+  labs(
+    title = "Total area of buildings in acres (2020)",
+    subtitle = "by Block Group",
+    fill = "Total Area",
+    caption = "Open Data DC"
+  )
+
+lot_map <- dc_full_data |> ggplot() +
+  geom_sf(aes(fill = plot_pct)) +
+    scale_fill_gradient(
+    low = "#28292b",
+    high = "#f8a700"
+    ) +
+  theme_minimal() +
+  labs(
+    title = "Percentage of area of parking lots (2020)",
+    subtitle = "by Block Group",
+    fill = "Percent Area",
+    caption = "Open Data DC"
+  )
+
+planting_map + building_map + lot_map
+
+```
+
 # Linear Regression
 
 JAMIE 12/12 - Added recipe for lm and rf and added lm model and fit below. Having trouble with this major warning:
 A | warning: prediction from rank-deficient fit; consider predict(., rankdeficient="NA")
 Also, I experimented here with removing all the columns that seemed duplicative. I did not add this to the dt recipe for now. Let me know what you all think of removing these.
+
+STEPHANIE 12/13 - The main issue are the columns that have NA values. We need to decide if we should remove those or if it's possible for us to do data imputation aka decide what those values should be.
 
 ```{r}
 
