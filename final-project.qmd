@@ -17,9 +17,7 @@ toc: true
 
 ## About This Project
 Climate Central's UHI index values (in °F) are "estimates of how much the urban built environment boosts temperatures. In other words, the UHI index is an estimate of the additional heat that local land use factors contribute to urban areas."
-
 Stephanie 12/10 - We'll need to change the above blurb based on what temperature data we use
-
 
 ## Setup
 
@@ -35,6 +33,8 @@ library(stringr)
 library(jsonlite)
 library(httr)
 library(tidymodels)
+library(knitr)
+library(data.table)
 
 # Clone the private github repository for this assignment using SSH link:
 # git@github.com:stejamilla/final-project.git
@@ -48,6 +48,9 @@ options(scipen = 999)
 # Exploring the Data
 
 ## Cleaning DC Land Cover Data
+
+JAMIE 12/12: I took out our removal of all vars containing "_ac" because I needed these land variables for the metrics - will remove them later below.
+
 ```{r}
 
 # Read in Urban Tree Canopy by Census Block Group (2020) data from Open Data DC
@@ -55,18 +58,28 @@ options(scipen = 999)
 landcover <- read_sf(paste0("data/Urban_Tree_Canopy",
                             "_by_Census_Block_Group_in_2020.shp")) |>
   rename(block_group = GEOID) |>
-  # Drop other unrelated UHI index, which, here, measures average temperature
-  # within each feature
   mutate(block_group = as.character(block_group)) |>
+  mutate(OBJECTID = as.character(OBJECTID)) |>
   rename_all(tolower) |>
-  # remove columns that provide measures in acres, to focus instead on
-  # percentage measures
-  dplyr::select(-contains("_ac")) |>
   relocate(block_group, .after = objectid) |>
   # Converting UHI to Fahrenheit
-  mutate(
-    uhi = (uhi*(9/5) + 32)
-  )
+  mutate(uhi = (uhi*(9/5) + 32))
+
+# Review vars for topline view and error coding
+kable(landcover_summary <- as_tibble(landcover |>
+                                       select(where(is.numeric)) |>
+                                       st_drop_geometry() |>
+                                       lapply(summary)) |>
+        mutate(measure = c("Min", "Q1", "Median", "Mean", "Q3", "Max")) |>
+        mutate(across(everything(), as.vector)) |>
+        pivot_longer(-measure) |>
+        pivot_wider(id_cols = "name",
+                    names_from = "measure",
+                    values_from = "value"))
+
+```
+
+```{r}
 
 # Create key with Urban Tree Canopy data column descriptions and clean up
 landcover_key <- read_csv("data/Urban_Tree_Canopy_Descriptions.csv",
@@ -77,53 +90,10 @@ landcover_key <- read_csv("data/Urban_Tree_Canopy_Descriptions.csv",
            sep = " ",
            extra = "merge") |>
   mutate(field = tolower(field))
-  
-```
-STEPHANIE 12/10 - I've readded UHI since we may use it if the temperature data doesn't work out. ~~Also, the "raster" package/library also has its own select() function, so if we mean the dplyr select() function moving forward, we'll have to use dplyr::select().~~ Also moved this up before the temperature data since we need to load the geometry data to then use with the temp data below.
-
-## Cleaning Temperature Data
-
-Initial testing of raster data manipulation (to delete)
-```{r}
-#| eval: false
-
-# Loading average July 2020 land surface temperature data
-temp_test <- raster("data/MOD_LSTD_M_2020-07-01_rgb_3600x1800.FLOAT.TIFF")
-
-# Pulling out the geometry from the landcover data
-dc <- landcover |>
-  dplyr::select(geometry, block_group) |>
-  st_transform(crs = crs(temp_test)) # Aligning coordinate systems
-
-# Aligning coordinate systems
-heat <- extract(temp_test, dc, fun = mean)
-
-# Creating temperature dataset
-dc_temp <- bind_cols(heat, dc) |>
-  rename(temp = ...1) 
-
-dc_temp_sf <- st_as_sf(dc_temp) 
-
-dc_temp |>
-  count(temp)
-
-# Visualizing temperature data
-dc_temp_sf |>
-  ggplot() +
-  geom_sf(mapping = aes(fill = temp)) +
-  scale_fill_gradient(
-    'Temperature',
-    low = 'blue',
-    high = 'red'
-  ) +
-  labs(title = "DC Average July 2020 Temperature") +
-  theme_minimal() 
-
-# Exploring UHI variable
-st_drop_geometry(landcover) |>
-  count(uhi)
 
 ```
+
+
 Stephanie 12/10 - Downloaded temperature data from NASA's Earth Observations: https://neo.gsfc.nasa.gov/view.php?datasetId=MOD_LSTD_M&date=2020-07-01
 
 ## Exploring Census Demographic Data
@@ -131,87 +101,44 @@ Stephanie 12/10 - Downloaded temperature data from NASA's Earth Observations: ht
 ```{r}
 
 # Load ACS 5-yr 2016-2020 data
-variables <- load_variables(2020, "acs5") |>
+acs_variables <- load_variables(2020, "acs5") |>
   filter(geography == "block group")
 
 ```
-STEPHANIE PRE-12/3
-I (Stephanie) think we could use some or all of the following ACS data:
-* B01003_001 - Total population
-* B02001_002 through B02001_010 - Population for different racial groups
-* B15003_002 through B15003_025 - Educational attainment of those 25 and over
-* B19001_002 through B19001_017 - Household income in the past 12 months
-* B25001_001 - Total # of housing units
-* B25002_002 & B25002_003 - Total # of occupied or vacant units
-* B25075_002 through B25075_027 - Total value of housing units
-
-I'll only load a few below for analysis since we haven't agreed on the variables yet, but I want to be able to play around with some data. -Stephanie
-
-JAMIE 12/3 - I like these variables! Here are some ideas to scale them and make them relatable across areas and years:
-* B01003_001 - Total population
-- Log population growth since the previous 5-yr ACS
-- Population per square mile or other distance (density)
-- Population per total # of housing units
-
-* B02001_002 through B02001_010 - Population for different racial groups
-- Same thoughts as above
-
-* B15003_002 through B15003_025 - Educational attainment of those 25 and over
-- Share of population with each level of educational attainment
-- Population with each level of educational attainment per square mile, or other distance (density of educational attainment)
-- Population with each level of educational attainment per total # of housing units
-
-* B19001_002 through B19001_017 - Household income in the past 12 months
-- We just need to put in terms of one year's dollars - such as 2020 dollars
-- Maybe we can use a metric that standardizes this relative to the living wage in the area (using a source like the MIT living wage calculator)
-
-* B25075_002 through B25075_027 - Total value of housing units
-- Same thoughts as above, need to put in terms of one year's dollars
-
-If these are of interest, I'm happy to pull the data and add the calculations.
-
-MADELEINE 12/4:
-I think all the variables listed above sound good. I'd perhaps add either
-* B25064_001 - Median gross rent, or
-* B25071_001 - Median gross rent as a percentage of household income
-
-Thinking that these help provide more of a sense of what it actually costs to live in that neighborhood vs. just the value of property (though I also think value is important).
-
-A couple questions:
-- I'm not sure we need to convert to 2020 dollars since it seems like that may have already been done? If you look at the concept column for the B19001 vars, for instance, it says "in 2020 inflation-adjusted dollars".
-- Is there a reason we are planning to use the bracketed variables instead of continuous? for instance, B19001_01 vs. 02 through 017
-
-Stephanie 12/4
-Remember we have to think about weights!
-
-
 
 MADELEINE 12/12: I added the following variables: Population by race (B02001...), total continuous HH income (B19001_001E), median property value (B25077_001E), total property value (	
 B25075_001E), median gross rent as % HH income (B25071_001E), total educational attainment (B15003_001E). Some notes/thoughts:
 
 * We obviously don't need both the income categories and the continuous income - I just wanted to add in everything for now for data exploration. We can always drop the variables we're not using later downstream
+JAMIE 12/12 - I took out the category vars, let me know if anybody wants to add back in! I think the total measure would just give us the total line from the table that breaks down all income levels (for example, see the total line here: https://data.census.gov/table/ACSDT5Y2021.B19001?q=B19001). I added the median var below.
 
 * Also prob don't need both total and median property values - just wanted to look at both
+JAMIE 12/12 - Agreed, and here too, I don't think the total line would be super helpful (see total line here: https://data.census.gov/table?q=B25075) - I removed it to avoid confusion, hope that's ok!
 
 * Also wondering if we should use median HH income instead of total?
+JAMIE 12/12 - I added in median below!
 
 * I believe the race categories I included should sum to the total population, but will test this
+JAMIE 12/12 - I think based on my reading of the Census methodologies, they normally warn that they don't sum because of estimation and error at each level. But I think this would only a problem if we're trying to sum them and use the total. 
 
 * I'm not sure what "total educational attainment" looks like - will do some testing there too. If it's hard to interpret or not in a useful format, we can use the categorical education variables (would probably want to consolidate them into fewer categories like HS or less, some college, BA+)
+JAMIE 12/12 - Here too, normally this total line is just the sum of all individuals, just to provide a total line in the table for users who only access that table and need a sum (For example it would just represent the total line in this table: https://data.census.gov/table/ACSDT1Y2023.B15003?q=B15003). As I mentioned above re: race sums, they probably won't sum exactly.
 
-* It occurs to me we may need to choose baseline categories for any categorical variables we include and leave those out? Not sure if that is only a requirement for linear regression? 
+* It occurs to me we may need to choose baseline categories for any categorical variables we include and leave those out? Not sure if that is only a requirement for line and linear regression?
+JAMIE 12/12 - Good point! I'm adding stuff in below without factoring that in for now, but I think we def need to determine if we need to deal with this!
 
 ## Loading Census demographic data via API
+
+JAMIE 12/12 - Unfortunately I think we have to code -66666s as NAs. See here: http://bit.ly/3DnlfIh
+"-666666666: The estimate could not be computed because there were an insufficient number of sample observations...For a 5-year median estimate, the margin of error associated with a median was larger than the median itself." I'm going to take out the code turning them to 0s and put in my code converting them to NAs - let me know if you guys disagree. This starts to get into the MOE issues Professor Williams was talking about...could become a problem...
+
+JAMIE 12/12 - We have some duplicative vars but leaving them in for now...
 
 ```{r}
 
 # Secure Census API key (from .env file) for use in Census API call
 load_dot_env()
 credential <- Sys.getenv("census_api_key")
-
-### I think since we're not using the tidycensus package to obtain the ACS data,
-### we don't need this code
-# census_api_key(credential, install = TRUE, overwrite = TRUE)
 
 # Create url for API call
 url <- str_glue(paste0("https://api.census.gov/data/2020/acs/acs5?get=",
@@ -231,67 +158,37 @@ url <- str_glue(paste0("https://api.census.gov/data/2020/acs/acs5?get=",
              "B02001_006E,",
              # TOTAL POPULATION BY RACE - OTHER ALONE + TWO OR MORE RACES
              "B02001_008E,",
-             # TOTAL LESS THAN $10,000
-             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
-             "B19001_002E,",
-             # TOTAL $10,000 - $14,999
-             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
-             "B19001_003E,",
-             # TOTAL $15,000 - $19,999
-             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS   
-             "B19001_004E,",
-             # TOTAL $20,000 - $24,999
-             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS             
-             "B19001_005E,",
-             # TOTAL $25,000 - $29,999
-             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
-             "B19001_006E,",
-             # TOTAL $30,000 - $34,999
-             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS      
-             "B19001_007E,",
-             # TOTAL $35,000 - $39,999
-             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
-             "B19001_008E,",
-             # TOTAL $40,000 - $44,999
-             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
-             "B19001_009E,",
-             # TOTAL $45,000 - $49,999
-             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
-             "B19001_010E,",
-             # TOTAL $50,000 - $59,999
-             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
-             "B19001_011E,",
-             # TOTAL $60,000 - $74,999
-             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS       
-             "B19001_012E,",
-             # TOTAL $75,000 - $99,999
-             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
-             "B19001_013E,",
-             # TOTAL $100,000 - $124,999
-             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
-             "B19001_014E,",
-             # TOTAL $125,000 - $149,999
-             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
-             "B19001_015E,",
-             # TOTAL $150,000 - $199,999
-             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
-             "B19001_016E,",
-             # TOTAL $200,000 or more
-             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
-             "B19001_017E,",
-             # TOTAL CONTINUOUS
-             # HOUSEHOLD INCOME IN THE PAST 12 MONTHS
-             "B19001_001E,",
+             # TOTAL HISPANIC OR LATINO
+             "B03003_001E,",
+             # TOTAL POP WITH DOCTORATE DEGREE
+             "B15003_025E,",
+             # TOTAL POP WITH PROFESSIONAL SCHOOL DEGREE
+             "B15003_024E,",
+             # TOTAL POP WITH MASTER'S DEGREE
+             "B15003_023E,",
+             # TOTAL POP WITH BACHELORS DEGREE
+             "B15003_022E,",
+             # TOTAL POP WITH ASSOCIATES DEGREE
+             "B15003_021E,",
+             # TOTAL POP WITH REGULAR HIGH SCHOOL DIPLOMA
+             "B15003_017E,",
+             # TOTAL POP WITH GED OR ALTERNATIVE CREDENTIAL
+             "B15003_018E,",
+             # MEDIAN HH INCOME IN PAST 12 MOS
+             "B19013_001E,",
+             # TOTAL HOUSING UNITS
+             "B25002_001E,",
+             # TOTAL OCCUPIED HOUSING UNITS
+             "B25002_002E,",
+             # TOTAL VACANT HOUSING UNITS
+             "B25002_003E,",
              # MEDIAN PROPERTY VALUE
              "B25077_001E,",
-             # TOTAL PROPERTY VALUE
-             "B25075_001E,",
+             # MEDIAN GROSS RENT
+             "B25064_001E,",
              # MEDIAN GROSS RENT
              # AS A PERCENTAGE OF HOUSEHOLD INCOME IN THE PAST 12 MONTHS
-             "B25071_001E,",
-             # TOTAL EDUCATIONAL ATTAINMENT
-             # FOR THE POPULATION 25 YEARS AND OLDER
-             "B15003_001E",
+             "B25071_001E",
              # Limit to block-group-level data for DC
              "&for=block%20group:*&for=tract:*&in=state:11&in=county:001"))
 
@@ -315,36 +212,34 @@ acs_data <- as_tibble(acs_matrix[2:nrow(acs_matrix), ],
 names(acs_data) <- acs_matrix[1, ] |>
   str_replace(" ", "_")
 
-# Clean up data
+```
+
+```{r}
+
+# Clean up ACS data
 acs_data <- acs_data |>
   rename(total_pop = B01003_001E,
-         pop_race_white = B02001_002E,
-         pop_race_black = B02001_003E,
-         pop_race_amerind = B02001_004E,
-         pop_race_asian = B02001_005E,
-         pop_race_hi_pi = B02001_006E,
-         pop_race_oth_mult = B02001_008E,
-         nc_less_10000 = B19001_002E,
-         inc_10000_14999 = B19001_003E,
-         inc_15000_19999 = B19001_004E,
-         inc_20000_24999 = B19001_005E,
-         inc_25000_29999 = B19001_006E,
-         inc_30000_34999 = B19001_007E,
-         inc_35000_39999 = B19001_008E,
-         inc_40000_44999 = B19001_009E,
-         inc_45000_49999 = B19001_010E,
-         inc_50000_59999 = B19001_011E,
-         inc_60000_74999 = B19001_012E,
-         inc_75000_99999 = B19001_013E,
-         inc_100000_124999 = B19001_014E,
-         inc_125000_149999 = B19001_015E,
-         inc_150000_199999 = B19001_016E,
-         inc_200000_more = B19001_017E,
-         inc_continuous = B19001_001E,
+         race_white = B02001_002E,
+         race_black = B02001_003E,
+         race_ai_an = B02001_004E,
+         race_asian = B02001_005E,
+         race_nh_pi = B02001_006E,
+         race_oth_mult = B02001_008E,
+         race_eth_hisp = B03003_001E,
+         ed_doct = B15003_025E,
+         ed_prof_deg = B15003_024E,
+         ed_master = B15003_023E,
+         ed_bach = B15003_022E,
+         ed_assoc = B15003_021E,
+         ed_ged = B15003_018E,
+         ed_reg_hsd = B15003_017E,
+         med_hhi = B19013_001E,
          med_prop_val = B25077_001E,
-         tot_prop_val = B25075_001E,
+         med_gross_rent = B25064_001E,
          med_rent_pct_inc = B25071_001E,
-         educ_total = B15003_001E,
+         total_hous_units = B25002_001E,
+         vac_units = B25002_003E,
+         occ_units = B25002_002E,
          block_group_temp = block_group) |>
   # Create block_group column to use for combining this with the other datasets
   mutate(block_group = paste(state,
@@ -352,67 +247,200 @@ acs_data <- acs_data |>
                              tract, 
                              block_group_temp,
                              sep = "")) |>
-  # Median property value and median rent as % HH income need some recoding
-  # I'm replacing -666666's with 0. This might not be a complete solution,
-  # but didn't want to introduce NA's into our data if not necessary
-  mutate(
-    med_prop_val = if_else(
-      med_prop_val >= 1, med_prop_val, "0"),
-    med_rent_pct_inc = if_else(
-      med_rent_pct_inc >= 1, med_rent_pct_inc, "0")
-    ) |>
   rename_all(tolower) |>
-  relocate(block_group, .before = name)
-                             
+  relocate(block_group, .before = name) |>
+  mutate_at(vars(total_pop:med_rent_pct_inc), as.numeric)
+
+# Review vars for topline view and error coding
+kable(acs_data_summary <- as_tibble(acs_data |>
+  select(where(is.numeric)) |>
+  lapply(summary)) |>
+  mutate(measure = c("Min", "Q1", "Median", "Mean", "Q3", "Max")) |>
+  mutate(across(everything(), as.vector)) |>
+  pivot_longer(-measure) |>
+  pivot_wider(id_cols = "name",
+              names_from = "measure",
+              values_from = "value"))
+
+# NOTE ACS error coding: "The estimate could not be computed because there were
+# an insufficient number of sample observations. For a ratio of medians
+# estimate, one or both of the median estimates falls in the lowest interval or
+# highest interval of an open-ended distribution. The estimate could not be
+# computed because there were an insufficient number of sample observations.
+# For a ratio of medians estimate, one or both of the median estimates falls in
+# the lowest interval or highest interval of an open-ended distribution. For a
+# 5-year median estimate, the margin of error associated with a median was
+# larger than the median itself." (http://bit.ly/3DnlfIh)
+acs_data <- acs_data |>
+  mutate(med_hhi = if_else(med_hhi == -666666666, NA, med_hhi),
+         med_prop_val = if_else(med_prop_val == -666666666, NA, med_prop_val),
+         med_gross_rent = if_else(med_gross_rent == -666666666, NA, med_gross_rent),
+         med_rent_pct_inc = if_else(med_rent_pct_inc == -666666666, NA, med_rent_pct_inc))
+
+# Rerun summary measures
+kable(acs_data_summary <- as_tibble(acs_data |>
+                                      select(where(is.numeric)) |>
+                                      lapply(summary) |>
+                                      lapply(`length<-`, 6)) |>
+        mutate(measure = c("Min", "Q1", "Median", "Mean", "Q3", "Max")) |>
+        mutate(across(everything(), as.vector)) |>
+        pivot_longer(-measure) |>
+        pivot_wider(id_cols = "name",
+                    names_from = "measure",
+                    values_from = "value"))
+
 ```
 
+## Stitching Together Final Dataset
 
-Exploration of some of the continuous variables
+JAMIE 12/12: Note I changed the name of the main df we are using pre-split to "dc_full_data." ALSO note that I moved the hotspot / not hotspot var to the below code chunk to streamline data cleanup.
+
+Moved your threshold notes here:
+STEPHANIE PRE-12/3
+Since there's 571 block groups, that means if we want to decide the heat threshold is where 50% of the data is above/below this line, then we'd want to pick the UHI value where cumulative = 285 or 286. The closest datapoint is UHI = 7.9 (Where cumulative = 268). I vote that we pick UHI <= 7.9 means not a heat island whereas UHI > 7.9 means it is a heat island.
+
+MADELEINE 12/4
+We might want to consider a higher threshold? I'm thinking it would be more meaningful to point out, say, the hottest 25% of block groups vs. the top 50%.
+
+MADELEINE 12/12
+New 50% threshold (UHI data from landcover; C to F conversion) is 90.1.
+
+
 ```{r}
 
-# Income continuous
-acs_data |>
+# Create final dataset and add metrics
+dc_full_data <- left_join(landcover, acs_data, by = "block_group") |>
+  mutate(
+    # convert total acres to sq miles
+    total_sq_mi = total_ac * 0.0015625,
+    # convert water acres to sq miles
+    water_sq_mi = wat_ac * 0.0015625,
+    # calculate water share of total sq miles
+    share_water_sq_mi = water_sq_mi / total_sq_mi,
+    # calculate population density per square mile
+    pop_dens_sq_mi = total_pop / total_sq_mi,
+    # calculate population density per water sq mile
+    pop_density_water_sq_mi = total_pop / water_sq_mi,
+    # calculate ratio of housing units to population
+    hous_units_per_person = total_hous_units / total_pop,
+    # calculate ratio of vacant units to all units
+    vac_units_share = vac_units / total_hous_units,
+    # calculate ratio of total income to median home value
+    inc_home_val_ratio = med_hhi / med_prop_val,
+    # create combined HS diploma or equivalent variable
+    ed_comb_hsd = ed_reg_hsd + ed_ged,
+    # create combined advanced post-undergraduate variable
+    ed_comb_adv_deg = ed_doct + ed_prof_deg + ed_master,
+    # calculate ratio of 25+ pop with HSD to total pop
+    ed_hsd_ratio = ed_comb_hsd / total_pop,
+    # calculate ratio of 25+ pop with bachelor's degree to total pop
+    ed_bach_ratio = ed_bach / total_pop,
+    # calculate ratio of 25+ pop with advanced post-undergrad degree to total pop
+    ed_adv_ratio = ed_comb_adv_deg / total_pop,
+    # calculate pop share white
+    race_white_ratio = race_white / total_pop,
+    # calculate pop share black or african american
+    race_black_ratio = race_black / total_pop,
+    # calculate pop share american indian or alaska native
+    race_ai_an_ratio = race_ai_an / total_pop,
+    # calculate pop share asian
+    race_asian_ratio = race_asian / total_pop,
+    # calculate pop share native hawaiian or pacific islander
+    race_nh_pi_ratio = race_nh_pi / total_pop,
+    # calculate pop share two or more races
+    race_oth_mult_ratio = race_oth_mult / total_pop,
+    # calculate pop share hispanic or latino
+    race_eth_hisp_ratio = race_eth_hisp / total_pop,
+    # creating hotspot var for decision tree model
+    hotspot = if_else(uhi <= 90.1, "hotspot", "not hotspot"),
+    # remove factor from uhi var
+    uhi = as.numeric(levels(uhi))[uhi]) |>
+  relocate(c("block_group_temp", "tract"), .after = 2) |>
+  # remove columns with only one unique value
+  select(-objectid,
+         -name,
+         -state,
+         -statefp,
+         -county,
+         -countyfp,
+         -tractce,
+         -blkgrpce,
+         -namelsad,
+         -mtfcc,
+         -funcstat,
+         -field,
+         -shapearea,
+         -shapelen) |>
+  relocate(race_white_ratio:race_eth_hisp_ratio, .after = race_eth_hisp) |>
+  relocate(ed_comb_hsd:ed_adv_ratio, .after = ed_ged) |>
+  relocate(hous_units_per_person:inc_home_val_ratio, .after = med_rent_pct_inc) |>
+  relocate(total_sq_mi:pop_density_water_sq_mi, .after = inc_home_val_ratio) |>
+  relocate(total_pop:hotspot, .after = tract)
+
+```
+
+### Prepare the data for analysis
+
+JAMIE 12/12 - Changed the var names so that these are the splits we use for all models, not just decision tree
+
+* Do we need to separate into implementation df too?
+
+```{r}
+
+# Set seed
+set.seed(20241202)
+
+# Split sample and create training and testing datasets
+dc_split <- initial_split(data = dc_full_data, prop = 0.8)
+dc_train <- training(x = dc_split) 
+dc_test <- testing(x = dc_split)
+
+```
+
+JAMIE 12/12 - Do we want folds? added here
+
+```{r}
+
+# V-fold cross validation with 10 folds
+dc_folds <- vfold_cv(data = dc_train, v = 10)
+
+```
+
+JAMIE 12/12 - Since we can only do EDA on the training data - I moved the maps and vizs down here and changed the dfs to the training one!
+
+## Initial EDA
+
+### Exploration of some of the continuous variables
+
+JAMIE 12/12 - Flag that we have a warning message that 56 rows were removed in below viz - just flagging for now.
+
+```{r}
+
+# Median household income, continuous
+dc_train |>
   ggplot() +
-  geom_histogram(aes(x = as.numeric(inc_continuous))
+  geom_histogram(aes(x = as.numeric(med_hhi))
   )
 
 # Total educational attainment
-acs_data |>
-  ggplot() +
-  geom_histogram(aes(x = as.numeric(educ_total))
-  )
+#dc_train |>
+#  ggplot() +
+#  geom_histogram(aes(x = as.numeric(educ_total))
+#  )
 # Still not sure how to interpret this one. Might be worth going back to the categories
-```
-## Stitching Together Final Dataset
-
-Stephanie 12/11 - We'll have to change the bottom code due to using different temperature data
-MA 12/12 - Changed this to just join acs_data and landcover - may need more edits
-```{r}
-
-#dataset_interim <- left_join(acs_data, st_drop_geometry(dc_heat), by = "block_group")
-#dataset_final <- left_join(dataset_interim, landcover, by = "block_group")
-
-## Checking to make sure we have all the variables
-#colnames(dataset_final)
-
-# MA: copied and then commented out the above; rewriting with just ACS + landcover
-dataset_final <- left_join(acs_data, landcover, by = "block_group")
-# Checking to make sure we have all the variables
-colnames(dataset_final)
 
 ```
 
-## Initial EDA
 ### DC Temperature Map
 
 Stephanie 12/11 - We'll have to change the bottom code due to using different temperature data
-MA 12/12 - Created new map using landcover 'uhi' variable for temperature, but only using 'landcover' as a dataset - need to figure out how to make 'dataset_final' work
+MA 12/12 - Created new map using landcover 'uhi' variable for temperature, but only using 'landcover' as a dataset - need to figure out how to make 'dc_full_data' work
+
+JAME 12/12 - I fixed this - I guess we have to left_join with the sf df in the first position in left_join(), so that we join the non-sf df onto the sf df and it stays sf. BUT do we have to st_transform() since the crs is not 4326? Also, when I move the code to remove uhi BEFORE we do the training set, that means we can't run this map. Can we remove uhi afterward?
+
 ```{r}
 
-# MA: This just uses 'landcover'. I was getting errors trying to run the same code using 'dataset_final'
-# even though it should have all the same geometry data. Not sure if I'm forgetting a step
-
-landcover |> ggplot() +
+dc_train |> ggplot() +
   geom_sf(
     mapping = aes(fill = uhi),
     color = "white"
@@ -429,66 +457,58 @@ landcover |> ggplot() +
 
 ```
 
-# Supervised Machine Learning Applications
-
-## Decision Trees
+### Decision Tree EDA
 
 Stephanie 12/11 - We'll have to change the bottom code due to using different temperature data
 Madeleine 12/12 - Updated this to work with UHI variable from landcover
 Deciding the threshold for hot vs. not hot:
+
+JAMIE 12/12 - Now getting an error regarding the number of datapoints in cumulative...will have another look tomorrow. Do the numbers need to change since this is training data only?
+
 ```{r}
 
 # visualizing a cumulative histogram of counts of UHI values
-dataset_final |>
+dc_train |>
   group_by(uhi) |>
   ggplot(aes(uhi)) +
   geom_histogram(aes(y = cumsum(..count..)))
 
 # calculating frequency & cumulative frequency
-heat_freq <- dataset_final |>
-  count(uhi)
-heat_freq$cumulative <- cumsum(heat_freq$n) 
+heat_freq <- dc_train |>
+  count(uhi) |>
+  mutate(cumulative = cumsum(heat_freq$n))
 
 heat_freq |>
   filter(
     cumulative >= 285,
-    cumulative <= 286) |> head()
+    cumulative <= 286) |>
+  head()
 
 ```
-STEPHANIE PRE-12/3
-Since there's 571 block groups, that means if we want to decide the heat threshold is where 50% of the data is above/below this line, then we'd want to pick the UHI value where cumulative = 285 or 286. The closest datapoint is UHI = 7.9 (Where cumulative = 268). I vote that we pick UHI <= 7.9 means not a heat island whereas UHI > 7.9 means it is a heat island.
 
-MADELEINE 12/4
-We might want to consider a higher threshold? I'm thinking it would be more meaningful to point out, say, the hottest 25% of block groups vs. the top 50%.
+JAMIE 12/12 - I added back uhi here bc we need for the lm and rf models. I added a step_rm with uhi to the decision tree model instead.
 
-MADELEINE 12/12
-New 50% threshold (UHI data from landcover; C to F conversion) is 90.1.
-
-Implementing threshold:
 ```{r}
 
-dataset_final <- dataset_final |>
-  mutate(hotspot = if_else(uhi <= 90.1, "Hotspot", "Not Hotspot"))
-
-dataset_dt <- dataset_final |>
+# Prep the dataset for modeling
+dc_train <- dc_train |>
   st_drop_geometry() |>
-  select(-uhi, -geometry, -block_group, -name, -intptlat, -intptlon) 
-#dropping uhi because that would be the main decision tree factor
+  # dropping uhi because that would be the main decision tree factor
+  select(-block_group, -intptlat, -intptlon) 
 
 ```
 
-### Running decision tree
-STEPHANIE PRE-12/3
-Note: We should do some more data cleaning on dataset_final before running the decision tree but it's getting late and I am tired, so I'm leaving it as is for now -Stephanie
+
+JAMIE 12/12 - Making a note that we need to do step_rm() here to remove:
+- The vars ending in "_ac" that we wanted to remove originally
+- vars that contain info that is duplicative of other vars (i know if we have month and full date, we'd have to remove one; do you think if we have a ratio metric, we have to remove the vars used in the ratio? I'm not clear on that.)
+* Also changing the dataset used in the recipe to dt_train rather than the full df
+
+## Decision Tree
 ```{r}
 
-set.seed(20241202)
-
-dt_split <- initial_split(data = dataset_dt, prop = 0.8)
-dt_train <- training(x = dt_split) 
-dt_test <- testing(x = dt_split)
-
-dt_recipe <- recipe(formula = hotspot ~ ., data = dataset_dt) |>
+dt_recipe <- recipe(formula = hotspot ~ ., data = dc_train) |>
+  step_rm(uhi) |>
   themis::step_downsample(hotspot) |> #I don't know if we need this or not...
   step_nzv(all_numeric_predictors())
 
@@ -501,26 +521,168 @@ dt_workflow <- workflow() |>
   add_model(dt_model)
   
 dt_fitting <- dt_workflow |>
-  fit(data = dt_train)
+  fit(data = dc_train)
 
 rpart.plot::rpart.plot(x = dt_fitting$fit$fit$fit,
                        roundint = FALSE)
 
 ```
-Stephanie 12/4
-Looks like block group is the main determinant, which makes sense haha - should probably remove that column.
 
 ## Linear Regression
+
+# Having trouble with a factor error below that is over my head...will continue to work on it...
+https://stackoverflow.com/questions/44200195/how-to-debug-contrasts-can-be-applied-only-to-factors-with-2-or-more-levels-er
+
 ```{r}
 
+# Create the recipe
+dc_recipe <- recipe(formula = uhi ~ ., data = dc_train)
 
+# Model 2 - linear regression
+dc_lm_model <- 
+  linear_reg() |>
+  set_mode(mode = "regression") |>
+  set_engine(engine = "lm")
+
+# Linear regression workflow
+dc_lm_workflow <- 
+  workflow() |>
+  add_recipe(recipe = dc_recipe) |>
+  add_model(spec = dc_lm_model)
+  
+unloadNamespace("Metrics")
+
+# Fit the regression workflow
+dc_lm_fit <-
+  dc_lm_workflow |>
+  fit_resamples(
+    resamples = dc_folds,
+    metrics = metric_set(rmse),
+    control = control_resamples(save_workflow = TRUE))
 
 ```
 
 ## Random Forests
+
+JAMIE 12/12 - I do not really know what numbers to put for things like trees etc at the moment...just putting in what I used for the homework from class examples, for us to update later!
+
+* another error here I need to work through...
+
 ```{r}
 
+# Model 3 - random forest
+dc_rf_model <- 
+  rand_forest(
+  trees = 200,
+  mtry = tune(),
+  min_n = tune()) |>
+  set_mode(mode = "regression") |>
+  set_engine(
+    engine = "ranger", 
+    importance = "impurity",
+    num.threads = 4
+  )
 
+# Create a parameter grid
+kable(dc_rf_grid <- grid_regular(mtry(range = c(1, 15)),
+                                min_n(range = c(1, 15)),
+                                levels = 5))
+
+# Random forest workflow
+dc_rf_workflow <- 
+  workflow() |>
+  add_recipe(dc_recipe) |>
+  add_model(dc_rf_model)
+
+# Fit the random forest workflow
+dc_rf_fit <-
+  dc_rf_workflow |>
+  tune_grid(
+    resamples = dc_folds,
+    grid = dc_rf_grid,
+    metrics = metric_set(rmse),
+    control = control_grid(save_workflow = TRUE))
+
+```
+
+#### Plot the RMSEs across each fit:
+
+```{r}
+
+# Create a df with rmses for all models
+
+# Extract rmses for rf approach
+rf <- as_tibble(
+  sapply(dc_rf_fit$.metrics, function(x) extract2(x, 1))) |>
+  select(V1) |>
+  rename(mtry = V1) |>
+  bind_cols(as_tibble(
+  sapply(dc_rf_fit$.metrics, function(x) extract2(x, 2)))) |>
+  select(mtry, V1) |>
+  rename(min_n = V1) |>
+  bind_cols(as_tibble(
+  sapply(dc_rf_fit$.metrics, function(x) extract2(x, 5)))) |>
+  rename_all( ~ str_replace(., "V", "Fold0")) |>
+  rename(Fold10 = Fold010) |>
+  pivot_longer(cols = 3:12,
+               names_to = "id",
+               values_to = "rmse") |>
+  mutate(model = "rf") |>
+  select(id, mtry, min_n, model, rmse)
+
+# Extract rmses for lm approaches
+lm <- tibble(
+  id = dc_lm_fit$id,
+  lm = as_vector(sapply(dc_lm_fit$.metrics, function(x) extract2(x, 3)))) |>
+  pivot_longer(cols = c("lm"),
+               names_to = "model",
+               values_to = "rmse") |>
+  mutate(nn = NA,
+         mtry = NA,
+         min_n = NA) |>
+  select(id, mtry, min_n, model, rmse)
+
+# Create one df containing all rmses
+fit_comps <- bind_rows(lm, rf)
+
+# Plot the rmses
+fit_comps |>
+  ggplot(mapping = aes(x = model, y = rmse)) +
+  geom_point() +
+  labs(title = "RMSE of Linear Regression and Random Forest Models",
+       subtitle = paste0("Prediction Model Evaluation for Washington, DC\n",
+                         "Urban Heat Index (UHI)"),
+       x = "Prediction Model",
+       y = "RMSE")
+
+# print average rmse per model
+kable(avg_rmse <- tibble(
+  model = c("lm", "rf"),
+  rmse = c(mean(fit_comps$rmse[fit_comps$model=="lm"]),
+           mean(fit_comps$rmse[fit_comps$model=="rf"]))) |>
+    arrange(rmse))
+
+```
+
+### 2.4 Estimate the out-of-sample error rate
+
+```{r}
+
+library(Metrics)
+
+# save best lm fit
+best_lm_fit <- fit_best(dc_lm_fit, verbose = TRUE)
+
+# make predictions using best fit
+test_predictions <-
+  dc_modeling_test |>
+  select(uhi) |>
+  rename(y = uhi) |>
+  mutate(y = as.numeric(y)) |>
+  mutate(y_hat = as.numeric(as_vector(predict(best_lm_fit, dc_modeling_test))))
+
+# collect rf metrics
+kable(rmse(actual = test_predictions$y, predicted = test_predictions$y_hat))
 
 ```
 
@@ -531,5 +693,10 @@ https://www.climatecentral.org/climate-matters/urban-heat-islands-2024
 
 https://opendata.dc.gov/datasets/DCGIS::urban-tree-canopy-by-census-block-group-in-2020/about
 
-Census ACS
+Census ACS 5yr 2016 - 2020
+
+https://neo.gsfc.nasa.gov/view.php?datasetId=MOD_LSTD_M&date=2020-07-01
+
+https://www2.census.gov/programs-surveys/acs/tech_docs/accuracy/MultiyearACSAccuracyofData2020.pdf
+
 
