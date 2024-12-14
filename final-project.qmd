@@ -335,6 +335,12 @@ Did we want to go with 25% for hotspot vs 75%? I'm fine to change the threshold,
 
 I've taken care of all the NaN values but haven't dealt with the NA values which I've found in the following columns: med_hhi, med_prop_val, med_gross_rent, med_rent_pct_inc, income_home_val_ratio.
 
+JAMIE 12/13 - Just to make sure we're all on the same page, some values of the variables med_hhi, med_prop_val, med_gross_rent, and med_rent_pct_inc have NAs because these entries had error coding "-666666666" - see table in code chunk #8. I recoded them to NA.
+
+Description of "-666666666" error code from the Census: (http://bit.ly/3DnlfIh). NOTE for our 5-yr estimate data, this appears to be an MOE issue (see last sentence):
+
+The estimate could not be computed because there were an insufficient number of sample observations. For a ratio of medians estimate, one or both of the median estimates falls in the lowest interval or highest interval of an open-ended distribution. For a 5-year median estimate, the margin of error associated with a median was larger than the median itself.
+
 ```{r}
 
 # Create final dataset and add metrics
@@ -1028,5 +1034,7 @@ https://opendata.dc.gov/datasets/DCGIS::urban-tree-canopy-by-census-block-group-
 Census ACS 5yr 2016 - 2020
 
 https://www2.census.gov/programs-surveys/acs/tech_docs/accuracy/MultiyearACSAccuracyofData2020.pdf
+
+http://bit.ly/3DnlfIh
 
 
