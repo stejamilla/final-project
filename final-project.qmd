@@ -347,7 +347,7 @@ New 50% threshold (UHI data from landcover; C to F conversion) is 90.1.
 STEPHANIE 12/13
 Did we want to go with 25% for hotspot vs 75%? I'm fine to change the threshold, we'll just have to justify which level to go for.
 
-Also, here's the data that has missing values (as per a warning message from random forests) - Missing data in columns: race_white_ratio, race_ai_an_ratio, race_asian_ratio, race_oth_mult_ratio, ed_hsd_ratio, ed_bach_ratio, ed_adv_ratio, med_hhi, med_prop_val, med_rent_pct_inc, hous_units_per_person, vac_units_share, inc_home_val_ratio.
+I've taken care of all the NaN values but haven't dealt with the NA values which I've found in the following columns: med_hhi, med_prop_val, med_gross_rent, med_rent_pct_inc, income_home_val_ratio.
 
 ```{r}
 
@@ -363,11 +363,11 @@ dc_full_data <- left_join(landcover, acs_data, by = "block_group") |>
     # calculate population density per square mile
     pop_dens_sq_mi = total_pop / total_sq_mi,
     # calculate population density per water sq mile
-    pop_density_water_sq_mi = total_pop / water_sq_mi,
+    pop_density_water_sq_mi = ifelse(water_sq_mi !=0, total_pop / water_sq_mi, 0),
     # calculate ratio of housing units to population
-    hous_units_per_person = total_hous_units / total_pop,
+    hous_units_per_person = ifelse(total_hous_units != 0, total_hous_units / total_pop, 0),
     # calculate ratio of vacant units to all units
-    vac_units_share = vac_units / total_hous_units,
+    vac_units_share = ifelse(total_hous_units != 0, vac_units / total_hous_units, 0),
     # calculate ratio of total income to median home value
     inc_home_val_ratio = med_hhi / med_prop_val,
     # create combined HS diploma or equivalent variable
@@ -375,29 +375,29 @@ dc_full_data <- left_join(landcover, acs_data, by = "block_group") |>
     # create combined advanced post-undergraduate variable
     ed_comb_adv_deg = ed_doct + ed_prof_deg + ed_master,
     # calculate ratio of 25+ pop with HSD to total pop
-    ed_hsd_ratio = ed_comb_hsd / total_pop,
+    ed_hsd_ratio = ifelse(ed_comb_hsd !=0, ed_comb_hsd / total_pop, 0),
     # calculate ratio of 25+ pop with bachelor's degree to total pop
-    ed_bach_ratio = ed_bach / total_pop,
+    ed_bach_ratio = ifelse(ed_bach != 0, ed_bach / total_pop, 0),
     # calculate ratio of 25+ pop with advanced post-undergrad degree to total pop
-    ed_adv_ratio = ed_comb_adv_deg / total_pop,
+    ed_adv_ratio = ifelse(ed_comb_adv_deg != 0, ed_comb_adv_deg / total_pop, 0),
     # calculate pop share white
-    race_white_ratio = race_white / total_pop,
+    race_white_ratio = ifelse(race_white != 0, race_white / total_pop, 0),
     # calculate pop share black or african american
-    race_black_ratio = race_black / total_pop,
+    race_black_ratio = ifelse(race_black != 0, race_black / total_pop, 0),
     # calculate pop share american indian or alaska native
-    race_ai_an_ratio = race_ai_an / total_pop,
+    race_ai_an_ratio = ifelse(race_ai_an!= 0, race_ai_an / total_pop, 0),
     # calculate pop share asian
-    race_asian_ratio = race_asian / total_pop,
+    race_asian_ratio = ifelse(race_asian != 0, race_asian / total_pop, 0),
     # calculate pop share native hawaiian or pacific islander
-    race_nh_pi_ratio = race_nh_pi / total_pop,
+    race_nh_pi_ratio = ifelse(race_nh_pi != 0, race_nh_pi / total_pop, 0),
     # calculate pop share two or more races
-    race_oth_mult_ratio = race_oth_mult / total_pop,
+    race_oth_mult_ratio = ifelse(race_oth_mult != 0, race_oth_mult / total_pop, 0),
     # calculate pop share hispanic or latino
-    race_eth_hisp_ratio = race_eth_hisp / total_pop,
+    race_eth_hisp_ratio = ifelse(race_eth_hisp != 0, race_eth_hisp / total_pop, 0),
     # calculate total non-white population
     race_poc = race_black + race_ai_an + race_asian + race_nh_pi + race_oth_mult,
     # calculate pop share non-white
-    race_poc_ratio = race_poc / total_pop,
+    race_poc_ratio = ifelse(race_poc != 0, race_poc / total_pop, 0),
     # creating hotspot var for decision tree model
     hotspot = if_else(uhi >= 90.1, "hotspot", "not hotspot"),
     # remove factor from uhi var
@@ -425,6 +425,7 @@ dc_full_data <- left_join(landcover, acs_data, by = "block_group") |>
   relocate(total_pop:hotspot, .after = tract)
 
 ```
+
 
 ## Prepare the data for analysis (set seed & splitting)
 
