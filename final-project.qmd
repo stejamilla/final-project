@@ -978,6 +978,45 @@ kable(rmse(actual = test_predictions$y, predicted = test_predictions$y_hat))
 
 ```
 
+# Implement the Final Model
+
+STEPHANIE 12/13 - Setting up the final code block for when we decide which model we should make predictions from. This probably won't render because the random forest model isn't working at the time I'm writing this (7pm) 
+
+```{r}
+
+pred_test <- bind_cols(
+  dc_test,
+  predict(object = extract_workflow(#fill in with fitted model either lm or rf), 
+          new_data = dc_test)
+)
+
+select(pred_test, uhi, starts_with(".pred")) |>
+  print(n = 20)
+
+```
+
+## Visualizing the most important predictors
+```{r}
+
+#insert the best fitted model |>
+  extract_fit_parsnip() |>
+  vip(num_features = 20) %>%
+  .$data |>
+  mutate(
+    Importance = Importance / max(Importance),
+    Variable = fct_reorder(.x = Importance, .f = Variable)
+  ) |>
+  ggplot(aes(Importance, Variable)) +
+  geom_col()
+
+```
+
+STEPHANIE 12/13 - Then over here we should make some maps with the top ~3 variables as determined by the code chunk above
+```{r}
+
+
+
+```
 
 # Sources
 
