@@ -859,51 +859,65 @@ STEPHANIE 12/13 - I've decided to keep in downsampling because I think it's usef
 
 STEPHANIE 12/13 - Using dc_full_data as the dataset since it's possible we may accidentally do data leakage when mapping dc_train because we'll notice which block groups were excluded.
 
-```{r fig.width = 10, fig.height = 8}
+```{r fig.width = 8, fig.height = 8}
 
-planting_map <- dc_full_data |> ggplot() +
-  geom_sf(aes(fill = to_un_pct)) +
+canopy_map <- dc_full_data |> ggplot() +
+  geom_sf(aes(fill = utc_pct)) +
     scale_fill_gradient(
     low = "#fcbc32",
     high = "#4e974b"
     ) +
   theme_minimal() +
   labs(
-    title = "Percentage of area suitable for planting (2020)",
+    title = "Percentage of tree canopy",
     subtitle = "by Block Group",
     fill = "Percent Area",
-    caption = "Open Data DC"
+    caption = "Open Data DC (2020)"
   )
 
-building_map <- dc_full_data |> ggplot() +
-  geom_sf(aes(fill = bld_ac)) +
+planting_map <- dc_full_data |> ggplot() +
+  geom_sf(aes(fill = overall)) +
     scale_fill_gradient(
-    low = "#c4c8c0",
-    high = "#643424"
+    low = "#b8f29d",
+    high = "#c62336"
     ) +
   theme_minimal() +
   labs(
-    title = "Total area of buildings in acres (2020)",
+    title = "Tree planting suitability score",
     subtitle = "by Block Group",
-    fill = "Total Area",
-    caption = "Open Data DC"
+    fill = "Score",
+    caption = "Open Data DC (2020)"
   )
 
-lot_map <- dc_full_data |> ggplot() +
-  geom_sf(aes(fill = plot_pct)) +
+impervious_map <- dc_full_data |> ggplot() +
+  geom_sf(aes(fill = to_ia_pct)) +
     scale_fill_gradient(
     low = "#28292b",
     high = "#f8a700"
     ) +
   theme_minimal() +
   labs(
-    title = "Percentage of area of parking lots (2020)",
+    title = "Percentage covered by impervious surfaces",
     subtitle = "by Block Group",
     fill = "Percent Area",
-    caption = "Open Data DC"
+    caption = "Open Data DC (2020)"
   )
 
-planting_map + building_map + lot_map
+housing_map <- dc_full_data |> ggplot() +
+  geom_sf(aes(fill = hous_units_per_person)) +
+    scale_fill_gradient(
+    low = "#d893aa",
+    high = "#1dc664"
+    ) +
+  theme_minimal() +
+  labs(
+    title = "Housing units per person",
+    subtitle = "by Block Group",
+    fill = "# Housing Units",
+    caption = "ACS 2016-2020"
+  )
+
+canopy_map + planting_map + impervious_map + housing_map
 
 ```
 
