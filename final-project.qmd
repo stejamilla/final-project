@@ -117,8 +117,11 @@ Load ACS 5-yr 2016-2020 variables:
 ```{r}
 #| label: "ACS variable list for exploration"
 
-acs_variables <- load_variables(2020, "acs5") |>
+acs_variables_bg <- load_variables(2020, "acs5") |>
   filter(geography == "block group")
+
+acs_variables_tract <- load_variables(2020, "acs5") |>
+  filter(geography == "tract")
 
 ```
 
@@ -355,8 +358,6 @@ acs_data <- acs_data |>
   mutate(med_prop_val = if_else(
     med_prop_val < 0, propval_tract, med_prop_val)
   )
-         
-         
 
 ```
 
@@ -395,31 +396,31 @@ MADELEINE 12/14: Commenting this error codes section out since imputation remove
 
 # Creating the Final Dataset for Analysis
 
-STEPHANIE 12/13 - I had to move this up and change the dataset from dc_train to landcover because we have to show how we determine the threshold before using mutate on it in the following code chunk.
-
 ## Deciding threshold for hotspot vs. not hotspot
+
 Deciding the threshold for hot vs. not hot:
 ```{r}
 
-# visualizing a cumulative histogram of counts of UHI values
+# Visualizing a cumulative histogram of counts of UHI values
 landcover |>
   group_by(uhi) |>
   ggplot(aes(uhi)) +
   geom_histogram(aes(y = cumsum(..count..)))
 
-# calculating frequency & cumulative frequency
+# Calculating frequency & cumulative frequency
 heat_freq <- landcover |>
   count(uhi)
 
 heat_freq$cumulative <- cumsum(heat_freq$n)
 
+# Figuring out midpoint
 heat_freq |>
   filter(
     cumulative >= 285,
     cumulative <= 286) |>
   head()
 
-# exploring other ways to generate a cutoff
+# Exploring other ways to generate a cutoff
 heat_freq |> summarize(
   sd(uhi),
   mean(uhi)
@@ -438,6 +439,8 @@ heat_freq |>
 
 ```
 
+STEPHANIE 12/15 - I think doing one standard deviation makes sense. It didn't adversely affect the decision tree model at least, and probably makes more sense than just choosing the mid point.
+
 MADELEINE 12/14: I split up the join from the metrics because the ward-level imputation has to happen in between (after join, before metrics).
 
 ```{r}
@@ -448,8 +451,8 @@ dc_full_data <- left_join(landcover, acs_data, by = "block_group")
 ```
 
 ### Data Imputation Part 2
-Imputation part 2: for any data points still missing after imputing on tract level, impute on ward level
 
+Imputation part 2: for any data points still missing after imputing on tract level, impute on ward level
 ```{r}
 #| label: "Imputation - ward level"
 
@@ -484,6 +487,7 @@ dc_full_data <- dc_full_data |>
 
 ```
 
+## Finalizing full dataset
 
 ```{r}
 #| label: "Create metrics"
@@ -1061,8 +1065,6 @@ dc_recipe <- recipe(formula = uhi ~ ., data = dc_train) |>
 
 ```{r}
 
-d
-
 # Linear regression model
 dc_lm_model <- 
   linear_reg() |>
@@ -1077,15 +1079,12 @@ dc_lm_workflow <-
   
 unloadNamespace("Metrics")
 
-# Fit the regression workflow
-dc_lm_fit <-
-  dc_lm_workflow |>
-  fit_resamples(
-    resamples = dc_folds,
-    metrics = metric_set(rmse),
-    control = control_resamples(save_workflow = TRUE))
+dc_lm_resamples <- dc_lm_workflow |>
+  fit_resamples(resamples = dc_folds)
 
 ```
+
+STEPHANIE 12/15 - I took out fitting the model because we only really have to fit the best model between linear regression and random forests, since the purpose of fitting the model is to then create predictions from it, and we'd only want to create predictions based on the best model.
 
 # Random Forests
 
@@ -1108,9 +1107,9 @@ dc_rf_model <-
   )
 
 # Create a parameter grid
-kable(dc_rf_grid <- grid_regular(mtry(range = c(1, 15)),
-                                min_n(range = c(1, 15)),
-                                levels = 5))
+dc_rf_grid <- grid_regular(mtry(range = c(1, 15)),
+                           min_n(range = c(1, 15)),
+                           levels = 5)
 
 # Random forest workflow
 dc_rf_workflow <- 
@@ -1137,6 +1136,9 @@ show_best(rf_resamples)
 
 ```
 
+STEPHANIE 12/15 - I took out the kable() argument from the line of code when we make dc_rf_grid becuase we don't really need to see the grid at that point; what matters is the last line of code when you show which hyperparameters are the best ones to use.
+It looks like mtry = 15 and min_n = 4 are the best options.
+
 ### Implementing best hyperparameters based on tuning
 
 ```{r}
@@ -1144,8 +1146,8 @@ show_best(rf_resamples)
 # Filling in hyperparameters based on tuning
 dc_rf_model <- rand_forest(
   trees = 200,
-  mtry = #fill in based on the best resample,
-  min_n = #fill in based on the best resample
+  mtry = 15,
+  min_n = 4
 ) |>
   set_mode(mode = "regression") |>
   set_engine(
@@ -1163,6 +1165,28 @@ dc_rf_workflow <-
 rf_resamples <- dc_rf_workflow |>
   fit_resamples(resamples = dc_folds)
 
+```
+
+# Comparing Models
+## Plot the RMSEs across each fit:
+
+JAMIE 12/12 - Below is what I used in the assignment 07 hw to pull the metrics in the end, so pasted here and updated a bit. It renders!
+
+STEPHANIE 12/15 - I edited the code to be a bit more simple (also based on what I submitted for assignment 07)
+
+```{r}
+
+# Linear Regression: Calculating and plotting the RMSE for each resample
+collect_metrics(
+  dc_lm_resamples, 
+  summarize = FALSE) |>
+  filter(.metric == "rmse") |>
+  print() |>
+  ggplot(mapping = aes(x = id, y = .estimate, group = .metric)) +
+  geom_point() +
+  geom_line()
+
+# Random Forests: Calculating and plotting the RMSE for each resample
 rf_resamples |>
   collect_metrics(summarize = FALSE) |>
   filter(.metric == "rmse") |>
@@ -1171,72 +1195,23 @@ rf_resamples |>
   geom_point() +
   geom_line()
 
-```
-
-# Comparing Models
-## Plot the RMSEs across each fit:
-
-JAMIE 12/12 - Below is what I used in the assignment 07 hw to pull the metrics in the end, so pasted here and updated a bit. It renders!
-
-```{r}
-
-# Create a df with rmses for all models
-
-# Extract rmses for rf approach
-rf <- as_tibble(
-  sapply(dc_rf_fit$.metrics, function(x) extract2(x, 1))) |>
-  select(V1) |>
-  rename(mtry = V1) |>
-  bind_cols(as_tibble(
-  sapply(dc_rf_fit$.metrics, function(x) extract2(x, 2)))) |>
-  select(mtry, V1) |>
-  rename(min_n = V1) |>
-  bind_cols(as_tibble(
-  sapply(dc_rf_fit$.metrics, function(x) extract2(x, 5)))) |>
-  rename_all( ~ str_replace(., "V", "Fold0")) |>
-  rename(Fold10 = Fold010) |>
-  pivot_longer(cols = 3:12,
-               names_to = "id",
-               values_to = "rmse") |>
-  mutate(model = "rf") |>
-  select(id, mtry, min_n, model, rmse)
-
-# Extract rmses for lm approaches
-lm <- tibble(
-  id = dc_lm_fit$id,
-  lm = as_vector(sapply(dc_lm_fit$.metrics, function(x) extract2(x, 3)))) |>
-  pivot_longer(cols = c("lm"),
-               names_to = "model",
-               values_to = "rmse") |>
-  mutate(mtry = NA,
-         min_n = NA) |>
-  select(id, mtry, min_n, model, rmse)
-
-# Create one df containing all rmses
-fit_comps <- bind_rows(lm, rf)
-
-# Plot the rmses
-fit_comps |>
-  ggplot(mapping = aes(x = model, y = rmse)) +
-  geom_point() +
-  labs(title = "RMSE of Linear Regression and Random Forest Models\n",
-       subtitle = paste0("Prediction Model Evaluation for Washington, DC\n",
-                         "Urban Heat Index (UHI)"),
-       x = "Prediction Model",
-       y = "RMSE")
-
-# print average rmse per model
-kable(avg_rmse <- tibble(
-  model = c("lm", "rf"),
-  rmse = c(mean(fit_comps$rmse[fit_comps$model=="lm"]),
-           mean(fit_comps$rmse[fit_comps$model=="rf"]))) |>
-    arrange(rmse))
+# Comparing average rmse
+bind_rows(
+  "Linear regression" = collect_metrics(dc_lm_resamples) |>
+    filter(.metric == "rmse"), 
+  'Random forest' = collect_metrics(rf_resamples) |>
+    filter(.metric == "rmse"),
+  .id = "model"
+)
 
 ```
+
+STEPHANIE 12/15 - Based on this, it seems that linear regression is the better model over random forests by a fairly large margin, which I find interesting since I think usually random forest models out perform other models like lm and regression trees?
 
 ## Estimate the out-of-sample error rate
 
 JAMIE 12/13 - Added metrics work below
+STEPHANIE 12/15 - Sorry for my ignorance, but I'm not entirely sure what we're doing here - is it finding another metric to compare models? Based on the RMSE values above, it seems we should go with the regression model and then create predictions with that and then visualize the best predictors.
 
 ```{r}
 
@@ -1291,7 +1266,7 @@ select(pred_test, uhi, starts_with(".pred")) |>
 
 ```
 
-STEPHANIE 12/13 - Then over here we should make some maps with the top ~3 variables as determined by the code chunk above
+STEPHANIE 12/13 - Then with the code chunk below, we should make some maps with the top ~3 variables as determined by the code chunk above
 ```{r}
 
 
