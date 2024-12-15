@@ -149,7 +149,7 @@ JAMIE 12/12 - Unfortunately I think we have to code -66666s as NAs. See here: ht
 
 MADELEINE 12/14: I imputed most of the missing data using tract-level data below. I then filled in the remaining observations (where there was also no data for the tract) using wards, after we merge landcover and acs_data.
 
-JAMIE 12/12 - We have some duplicative vars but leaving them in here. I think we can remove at step_rm to keep it clean.
+
 
 ```{r}
 #| label: "Load ACS data"
@@ -323,6 +323,9 @@ This method is imperfect for two reasons:
 
 2) Median household income and median property value are top- and bottom-coded (no one has an income less than $2,499 or greater than $250,000). The only way around this I can think of would be to choose one or more cutoffs as I did with the rent burden variable (for example, categorize income into "high income" and "low income"). I didn't do this because I wasn't sure what those cutoffs would be. I'm also not really sure how much it matters, since either way we can't capture the real high- and low-end incomes.
 --
+
+STEPHANIE 12/15 - I've set up code to evaluate imputation from lines 348-372.
+
 Imputation part 1: replace missing data points with tract-level data.
 
 ```{r}
@@ -341,6 +344,32 @@ tract_data <- acs_data |>
     hhi_tract = mean(med_hhi, na.rm = TRUE),
     propval_tract = mean(med_prop_val, na.rm = TRUE)
   )
+
+# Evaluating mean imputation
+mean_imputed_hhi <- acs_data |>
+  left_join(tract_data, by = "tract") |>
+  mutate(
+    hhi_imputation = as.numeric(med_hhi < 0),
+    hhi_imputed = if_else(
+      med_hhi < 0,
+      hhi_tract,
+      med_hhi
+    )
+  ) |>
+  select(med_hhi, hhi_imputation, hhi_imputed) |>
+  # Replacing -666666666 values with NA for the sake of data visualization
+  mutate(med_hhi = if_else(
+    med_hhi < 0,
+    NA,
+    med_hhi
+  ))
+
+mean_imputed_hhi |>
+  ggplot(aes(med_hhi, hhi_imputed, fill = factor(hhi_imputation))) +
+  
+  geom_point(alpha = 0.2) +
+  labs(title = "Mean imputation does a poor job") +
+  theme_minimal()
 
 # Replace missing data with tract data:
   
@@ -749,7 +778,7 @@ dc_train |>
 
 STEPHANIE 12/13 - The graphs that compare UHI with percentage area of urban tree canopy and of impervious surfaces seems quite compelling. This makes sense, and it's interesting to notice how not a lot of the demographic stuff doesn't seem to show up in EDA but the landcover stuff seem like promising predictors.
 
-## Preparation for Modeling
+# Preparation for Modeling
 STEPHANIE 12/13 - I added "-tract" and "-ward" to remove more geographic indicators that likely would affect the model, since that otherwise would've been a main predictor of a hotspot
 
 JAMIE 12/12 - Do we want folds? added here. Not using folds does not make the lm rank deficient model warning go away.
@@ -1238,6 +1267,10 @@ kable(rmse(actual = test_predictions$y, predicted = test_predictions$y_hat))
 STEPHANIE 12/13 - Setting up the final code block for when we decide which model we should make predictions from. This probably won't render because the random forest model isn't working at the time I'm writing this (7pm) 
 
 ```{r}
+
+# Removing hotspot variable to be consistent with the recipe 
+dc_test <- dc_test |>
+  select(-hotspot)
 
 pred_test <- bind_cols(
   dc_test,
