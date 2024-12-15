@@ -23,6 +23,8 @@ Stephanie 12/10 - We'll need to change the above blurb based on what temperature
 
 Loading packages:
 ```{r}
+#| label: "Packages"
+#| output: false
 
 library(dotenv)
 library(tidyverse)
@@ -56,6 +58,7 @@ JAMIE 12/12: I took out our removal of all vars containing "_ac" because I neede
 
 Loading data from Open Data DC:
 ```{r}
+#| label: "Tree Canopy & ward data"
 
 # Loading Urban Tree Canopy by Census Block Group (2020) data
 landcover <- read_sf(paste0("data/Urban_Tree_Canopy",
@@ -78,6 +81,7 @@ wards <- read_sf("data/Urban_Tree_Canopy_by_Ward_in_2020.shp") |>
 
 Create key with Urban Tree Canopy data column descriptions and clean up:
 ```{r}
+#| label: "Landcover key"
 
 landcover_key <- read_csv("data/Urban_Tree_Canopy_Descriptions.csv",
                           col_names = FALSE) |>
@@ -92,6 +96,7 @@ landcover_key <- read_csv("data/Urban_Tree_Canopy_Descriptions.csv",
 
 Categorizing each block group into their respective ward:
 ```{r}
+#| label: "Spatial join landcover and wards"
 
 # Spatial join so that each block group is assigned a ward based on majority
 # area of a block group within a ward
@@ -110,23 +115,19 @@ STEPHANIE 12/13 - this code says that if a ward intersects with a blockgroup, th
 
 Load ACS 5-yr 2016-2020 variables:
 ```{r}
+#| label: "ACS variable list for exploration"
 
 acs_variables <- load_variables(2020, "acs5") |>
   filter(geography == "block group")
 
 ```
 
-MADELEINE 12/12: I added the following variables: Population by race (B02001...), total continuous HH income (B19001_001E), median property value (B25077_001E), total property value (	
-B25075_001E), median gross rent as % HH income (B25071_001E), total educational attainment (B15003_001E). Some notes/thoughts:
 
-* We obviously don't need both the income categories and the continuous income - I just wanted to add in everything for now for data exploration. We can always drop the variables we're not using later downstream
 JAMIE 12/12 - I took out the category vars, let me know if anybody wants to add back in! I think the total measure would just give us the total line from the table that breaks down all income levels (for example, see the total line here: https://data.census.gov/table/ACSDT5Y2021.B19001?q=B19001). I added the median var below.
+MADELEINE 12/14: good catch about the table totals! Working on imputation so we can use median
 
 * Also prob don't need both total and median property values - just wanted to look at both
-JAMIE 12/12 - Agreed, and here too, I don't think the total line would be super helpful (see total line here: https://data.census.gov/table?q=B25075) - I removed it to avoid confusion, hope that's ok!
-
-* Also wondering if we should use median HH income instead of total?
-JAMIE 12/12 - I added in median below!
+JAMIE 12/12 - Agreed, and here too, I don't think the total line would be super helpful (see total line here: https://data.census.gov/table?q=B25075) - I removed it to avoid confusion, hope that's ok! MADELEINE 12/14: yes!
 
 * I believe the race categories I included should sum to the total population, but will test this
 JAMIE 12/12 - I think based on my reading of the Census methodologies, they normally warn that they don't sum because of estimation and error at each level. But I think this would only a problem if we're trying to sum them and use the total. 
@@ -143,9 +144,13 @@ STEPHANIE 12/13 - I'm not too concerned about this because we've never had to ad
 JAMIE 12/12 - Unfortunately I think we have to code -66666s as NAs. See here: http://bit.ly/3DnlfIh
 "-666666666: The estimate could not be computed because there were an insufficient number of sample observations...For a 5-year median estimate, the margin of error associated with a median was larger than the median itself." I'm going to take out the code turning them to 0s and put in my code converting them to NAs - let me know if you guys disagree. This starts to get into the MOE issues Professor Williams was talking about...could become a problem...
 
+MADELEINE 12/14: I imputed most of the missing data using tract-level data below. I then filled in the remaining observations (where there was also no data for the tract) using wards, after we merge landcover and acs_data.
+
 JAMIE 12/12 - We have some duplicative vars but leaving them in here. I think we can remove at step_rm to keep it clean.
 
 ```{r}
+#| label: "Load ACS data"
+
 
 # Secure Census API key (from .env file) for use in Census API call
 load_dot_env()
@@ -195,11 +200,21 @@ url <- str_glue(paste0("https://api.census.gov/data/2020/acs/acs5?get=",
              "B25002_003E,",
              # MEDIAN PROPERTY VALUE
              "B25077_001E,",
-             # MEDIAN GROSS RENT
-             "B25064_001E,",
-             # MEDIAN GROSS RENT AS A PERCENTAGE OF HOUSEHOLD INCOME IN THE
-             # PAST 12 MONTHS
-             "B25071_001E",
+             # GROSS RENT AS A % OF HH INCOME IN PAST 12 MO -
+             # TOTAL
+             "B25070_001E,",
+             # GROSS RENT AS A % OF HH INCOME IN PAST 12 MO -
+             # 30 TO 34.9 %
+             "B25070_007E,",
+             # GROSS RENT AS A % OF HH INCOME IN PAST 12 MO -
+             # 35 TO 39.9 %
+             "B25070_008E,",
+             # GROSS RENT AS A % OF HH INCOME IN PAST 12 MO -
+             # 40 TO 49.9 %
+             "B25070_009E,",
+             # GROSS RENT AS A % OF HH INCOME IN PAST 12 MO -
+             # 50 % or more
+             "B25070_010E",
              # Limit to block-group-level data for DC
              "&for=block%20group:*&for=tract:*&in=state:11&in=county:001"))
 
@@ -225,10 +240,14 @@ names(acs_data) <- acs_matrix[1, ] |>
 
 ```
 
+Labeling and cleaning ACS variables
+
 ```{r}
+#| label: "Cleaning ACS data"
 
 # Clean up ACS data
 acs_data <- acs_data |>
+  # Meaningful variable names
   rename(total_pop = B01003_001E,
          race_white = B02001_002E,
          race_black = B02001_003E,
@@ -246,8 +265,11 @@ acs_data <- acs_data |>
          ed_reg_hsd = B15003_017E,
          med_hhi = B19013_001E,
          med_prop_val = B25077_001E,
-         med_gross_rent = B25064_001E,
-         med_rent_pct_inc = B25071_001E,
+         rent_burden_tot = B25070_001E,
+         rent_burden_30_34 = B25070_007E,
+         rent_burden_35_39 = B25070_008E,
+         rent_burden_40_49 = B25070_009E,
+         rent_burden_50plus = B25070_010E,
          total_hous_units = B25002_001E,
          vac_units = B25002_003E,
          occ_units = B25002_002E,
@@ -258,42 +280,115 @@ acs_data <- acs_data |>
                              tract, 
                              block_group_temp,
                              sep = "")) |>
+  # Convert Census variables to numeric
+  mutate_at(vars(total_pop:rent_burden_50plus), as.numeric) |>
   rename_all(tolower) |>
   relocate(block_group, .before = name)
+
+
+# Convert rent burden variables into a percentage of rent burdened households,
+# then dropping original rent burden vars
+acs_data <- acs_data |> 
+  mutate(
+    rent_burden_sum = 
+      rent_burden_30_34 + 
+       rent_burden_35_39 + 
+       rent_burden_40_49 + 
+       rent_burden_50plus
+    ) |>
+  mutate(
+    rent_burden_pct = (rent_burden_sum / rent_burden_tot)
+    ) |>
+  select(-c(rent_burden_30_34, 
+            rent_burden_35_39, 
+            rent_burden_40_49, 
+            rent_burden_50plus,
+            rent_burden_tot,
+            rent_burden_sum)
+         )
+```
+
+IMPUTATION
+The imputation logic works as follows:
+1) If data is missing at the block group level, use the mean for that block group's census tract.
+
+2) If data is still missing at the census tract level, use the mean for that census tract's ward. (This happens further down in the code.)
+
+This method is imperfect for two reasons:
+1) Imputed values at the census tract level feed into imputation at the ward level. For instance, say a ward is made up of 4 census tracts and each tract has 4 block groups. Initially, only 2/4 tracts have complete data. After imputing at the tract level, 3/4 are complete. When we go to impute the data for the final tract, that calculation will include the values we imputed for the other missing tract. I don't think this is that big of a deal, especially because the numbers of values that need to be imputed at the ward level is pretty small.
+
+2) Median household income and median property value are top- and bottom-coded (no one has an income less than $2,499 or greater than $250,000). The only way around this I can think of would be to choose one or more cutoffs as I did with the rent burden variable (for example, categorize income into "high income" and "low income"). I didn't do this because I wasn't sure what those cutoffs would be. I'm also not really sure how much it matters, since either way we can't capture the real high- and low-end incomes.
+--
+Imputation part 1: replace missing data points with tract-level data.
+
+```{r}
+#| label: "Imputation part 1"
+
+# Create tract dataframe
+tract_data <- acs_data |>
+  mutate(med_hhi = if_else(
+          med_hhi < 0, NA, med_hhi),
+         med_prop_val = if_else(
+           med_prop_val < 0, NA, med_prop_val)
+         ) |>
+  group_by(tract) |>
+  summarize(
+    rb_tract = mean(rent_burden_pct, na.rm = TRUE),
+    hhi_tract = mean(med_hhi, na.rm = TRUE),
+    propval_tract = mean(med_prop_val, na.rm = TRUE)
+  )
+
+# Replace missing data with tract data:
+  
+acs_data <- acs_data |>
+  left_join(tract_data, by = "tract") |>
+  # Rent burden
+  mutate(rent_burden_pct = if_else(
+    is.na(rent_burden_pct), rb_tract, rent_burden_pct)
+  ) |>
+  # Median HHI
+  mutate(med_hhi = if_else(
+    med_hhi < 0, hhi_tract, med_hhi)
+  ) |>
+  # Median property value
+  mutate(med_prop_val = if_else(
+    med_prop_val < 0, propval_tract, med_prop_val)
+  )
+         
+         
 
 ```
 
 JAMIE 12/12 - Note below the issues with the acs error codes
+MADELEINE 12/14: Commenting this error codes section out since imputation removes them - but didn't want to delete this just yet. I moved the conversion to numeric up to the main census variable cleaning chunk.
 
 ```{r}
 
 # Review frequency of ACS error coding (http://bit.ly/3DnlfIh)
-kable(acs_codes_summary <- acs_data |>
-  select(total_pop:med_rent_pct_inc) |>
-  summarise(across(everything(), list(
-    `sum-666666666` = ~sum(str_detect(., "-666666666"), na.rm=T),
-    `sum-999999999` = ~sum(str_detect(., "-999999999"), na.rm=T),
-    `sum-888888888` = ~sum(str_detect(., "-888888888"), na.rm=T),
-    `sum-222222222` = ~sum(str_detect(., "-222222222"), na.rm=T),
-    `sum-333333333` = ~sum(str_detect(., "-333333333"), na.rm=T),
-    `sum-555555555` = ~sum(str_detect(., "-555555555"), na.rm=T),
-    `sum*` = ~sum(. == "*", na.rm=T),
-    sumnull = ~sum(. == "null", na.rm=T),
-    sumNA = ~sum(is.na(.) == TRUE),
-    sumNA_Char = ~sum(. == "NA", na.rm=T)))) |>
-  pivot_longer(cols = everything(), 
-               names_to = c("colNames", ".value"),
-               names_sep="_sum") |>
-  filter(rowSums(across(where(is.numeric)))>0))
+#kable(acs_codes_summary <- acs_data |>
+#  select(total_pop:med_rent_pct_inc) |>
+#  summarise(across(everything(), list(
+#    `sum-666666666` = ~sum(str_detect(., "-666666666"), na.rm=T),
+#    `sum-999999999` = ~sum(str_detect(., "-999999999"), na.rm=T),
+#    `sum-888888888` = ~sum(str_detect(., "-888888888"), na.rm=T),
+#    `sum-222222222` = ~sum(str_detect(., "-222222222"), na.rm=T),
+#    `sum-333333333` = ~sum(str_detect(., "-333333333"), na.rm=T),
+#    `sum-555555555` = ~sum(str_detect(., "-555555555"), na.rm=T),
+#    `sum*` = ~sum(. == "*", na.rm=T),
+#    sumnull = ~sum(. == "null", na.rm=T),
+#    sumNA = ~sum(is.na(.) == TRUE),
+#    sumNA_Char = ~sum(. == "NA", na.rm=T)))) |>
+#  pivot_longer(cols = everything(), 
+#               names_to = c("colNames", ".value"),
+#               names_sep="_sum") |>
+#  filter(rowSums(across(where(is.numeric)))>0))
 
 # Replace the codes with NA
-acs_data <- acs_data |> 
-  mutate(across(where(is.character), 
-                ~if_else(str_detect(.,
-  "-666666666|-999999999|-888888888|-222222222|-333333333|-555555555|null"),
-                         NA_character_, .))) |>
-  # convert all to numeric |>
-  mutate_at(vars(total_pop:med_rent_pct_inc), as.numeric)
+#acs_data <- acs_data |> 
+#  mutate(across(where(is.character), 
+#                ~if_else(str_detect(.,
+#  "-666666666|-999999999|-888888888|-222222222|-333333333|-555555555|null"),
+#                         NA_character_, .))) 
 
 ```
 
@@ -342,27 +437,69 @@ heat_freq |>
 ```
 
 STEPHANIE 12/13 - There's something odd happening with race_eth_hisp_ratio, because I'm looking at the training data and the values are all 1 (or NaN), which presumably means that the population share of hispanic/latino is 100% for each block group, which presumably wouldn't happen??
+
 MADELEINE 12/14 - I figured this out and fixed it; we were pulling the total population from the ethnicity table, which is just equal to the total population overall. It should now be pulling the actual Hispanic/Latino count
 
-Moved your threshold notes here:
+Threshold for "hotspot": 
 
 STEPHANIE 12/13
 Did we want to go with 25% for hotspot vs 75%? I'm fine to change the threshold, we'll just have to justify which level to go for.
 
 MADELEINE 12/14: I am trying a new approach using 1 standard deviation above the mean, which makes the cutoff temp 91.6 F.
 
+(STEPHANIE?)
 I've taken care of all the NaN values but haven't dealt with the NA values which I've found in the following columns: med_hhi, med_prop_val, med_gross_rent, med_rent_pct_inc, income_home_val_ratio.
 
-JAMIE 12/13 - Just to make sure we're all on the same page, some values of the variables med_hhi, med_prop_val, med_gross_rent, and med_rent_pct_inc have NAs because these entries had error coding "-666666666" - see table in code chunk #8. I recoded them to NA.
+MADELEINE 12/14: I split up the join from the metrics because the ward-level imputation has to happen in between (after join, before metrics).
+```{r}
+#| label: "Create final dataset"
 
-Description of "-666666666" error code from the Census: (http://bit.ly/3DnlfIh). NOTE for our 5-yr estimate data, this appears to be an MOE issue (see last sentence):
+dc_full_data <- left_join(landcover, acs_data, by = "block_group") 
 
-The estimate could not be computed because there were an insufficient number of sample observations. For a ratio of medians estimate, one or both of the median estimates falls in the lowest interval or highest interval of an open-ended distribution. For a 5-year median estimate, the margin of error associated with a median was larger than the median itself.
+```
+
+Imputation part 2: for any data points still missing after imputing on tract level, impute on ward level
 
 ```{r}
+#| label: "Imputation - ward level"
 
-# Create final dataset and add metrics
-dc_full_data <- left_join(landcover, acs_data, by = "block_group") |>
+# Create ward-level dataframe
+ward_data <- dc_full_data |>
+  group_by(ward) |>
+  summarize(
+    rb_ward = mean(rent_burden_pct, na.rm = TRUE),
+    hhi_ward = mean(med_hhi, na.rm = TRUE),
+    propval_ward = mean(med_prop_val, na.rm = TRUE)
+  ) |>
+  st_drop_geometry()
+
+# Replace missing data with ward data:
+# Rent burden
+dc_full_data <- dc_full_data |>
+  left_join(ward_data, by = "ward") |>
+  mutate(
+    rent_burden_pct = if_else(
+      is.na(rb_tract), rb_ward, rent_burden_pct),
+    med_hhi = if_else(
+      is.na(hhi_tract), hhi_ward, med_hhi),
+    med_prop_val = if_else(
+      is.na(propval_tract), propval_ward, med_prop_val)
+    )
+  
+
+# Drop columns no longer needed
+dc_full_data <- dc_full_data |>
+  select(-c(rb_tract, rb_ward, 
+            hhi_tract, hhi_ward,
+            propval_tract, propval_ward))
+
+```
+
+
+```{r}
+#| label: "Create metrics"
+
+dc_full_data <- dc_full_data|>
   mutate(
     # convert total acres to sq miles
     total_sq_mi = total_ac * 0.0015625,
@@ -448,12 +585,13 @@ dc_full_data <- left_join(landcover, acs_data, by = "block_group") |>
   relocate(ed_comb_hsd:ed_adv_ratio,
            .after = ed_ged) |>
   relocate(hous_units_per_person:inc_home_val_ratio,
-           .after = med_rent_pct_inc) |>
+           .after = med_prop_val) |>
   relocate(total_sq_mi:pop_density_water_sq_mi,
            .after = inc_home_val_ratio) |>
   relocate(total_pop:hotspot, .after = tract)
 
 ```
+
 
 
 ## Prepare the data for analysis (set seed & splitting)
@@ -629,6 +767,7 @@ JAMIE 12/12 - Do we want folds? added here. Not using folds does not make the lm
 STEPHANIE 12/13 - I think yes, we'll have to use it, especially for hyper parameter tuning. My main issue with folding at this point is that I think we need to remove all the variables we don't want from dc_train first and then get do folding so that the folding process doesn't take them into account. So I think we should take out the variables from dc_train before the lm and rf models (using select rather than step_rm) and then do the folding.
 JAMIE 12/13 - Relocated these steps per discussion.
 
+MADELEINE 12/14 - should hotspot be kept in here? there is a comment saying "remove duplicative hotspot", but then the next code chunk seems to need it
 ```{r}
 
 # Prep the dataset for modeling
@@ -670,7 +809,6 @@ dc_train <- dc_train |>
     -total_hous_units,
     -occ_units,
     -vac_units,
-    -med_gross_rent,
     # remove duplicative land data (custom proportion / "pct" vars remain)
     -ends_with("_ac"),
     -total_sq_mi,
