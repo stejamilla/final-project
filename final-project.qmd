@@ -170,7 +170,7 @@ url <- str_glue(paste0("https://api.census.gov/data/2020/acs/acs5?get=",
              # TOTAL POPULATION BY RACE - OTHER ALONE + TWO OR MORE RACES
              "B02001_008E,",
              # TOTAL HISPANIC OR LATINO
-             "B03003_001E,",
+             "B03003_003E,",
              # TOTAL POP WITH DOCTORATE DEGREE
              "B15003_025E,",
              # TOTAL POP WITH PROFESSIONAL SCHOOL DEGREE
@@ -236,7 +236,7 @@ acs_data <- acs_data |>
          race_asian = B02001_005E,
          race_nh_pi = B02001_006E,
          race_oth_mult = B02001_008E,
-         race_eth_hisp = B03003_001E,
+         race_eth_hisp = B03003_003E,
          ed_doct = B15003_025E,
          ed_prof_deg = B15003_024E,
          ed_master = B15003_023E,
@@ -322,16 +322,34 @@ heat_freq |>
     cumulative <= 286) |>
   head()
 
+# exploring other ways to generate a cutoff
+heat_freq |> summarize(
+  sd(uhi),
+  mean(uhi)
+)
+# The standard deviation of UHI is 1.80
+# The mean is 89.8
+  # 1 SD above mean would be 91.6
+
+heat_freq |>
+  filter(uhi >= 91.6) |>
+  count()
+  
+# 82 block groups have a UHI value at least one SD above the mean. I think this 
+# might be a better metric to use than a 50th or 75th percentile ranking -
+# I found that the temps at those percentiles are actually really close.
+
 ```
 
 STEPHANIE 12/13 - There's something odd happening with race_eth_hisp_ratio, because I'm looking at the training data and the values are all 1 (or NaN), which presumably means that the population share of hispanic/latino is 100% for each block group, which presumably wouldn't happen??
+MADELEINE 12/14 - I figured this out and fixed it; we were pulling the total population from the ethnicity table, which is just equal to the total population overall. It should now be pulling the actual Hispanic/Latino count
 
 Moved your threshold notes here:
-MADELEINE 12/12
-New 50% threshold (UHI data from landcover; C to F conversion) is 90.1.
 
 STEPHANIE 12/13
 Did we want to go with 25% for hotspot vs 75%? I'm fine to change the threshold, we'll just have to justify which level to go for.
+
+MADELEINE 12/14: I am trying a new approach using 1 standard deviation above the mean, which makes the cutoff temp 91.6 F.
 
 I've taken care of all the NaN values but haven't dealt with the NA values which I've found in the following columns: med_hhi, med_prop_val, med_gross_rent, med_rent_pct_inc, income_home_val_ratio.
 
@@ -406,7 +424,7 @@ dc_full_data <- left_join(landcover, acs_data, by = "block_group") |>
       race_poc != 0, race_poc / total_pop, 0),
     # creating hotspot var for decision tree model
     hotspot = if_else(
-      uhi >= 90.1, "hotspot", "not hotspot"),
+      uhi >= 91.6, "hotspot", "not hotspot"),
     # remove factor from uhi var
     uhi = as.numeric(as.character(uhi))) |>
   relocate(c("block_group_temp", "tract"), .after = 2) |>
@@ -525,7 +543,7 @@ dc_full_data |> ggplot() +
     color = "#400001"
     ) +
     scale_fill_gradient(
-    low = "#f7ef9d",
+    low = "#ffffff",
     high = "#be2b25"
     ) +
   labs(
@@ -602,7 +620,7 @@ dc_train |>
 
 ```
 
-STEPHANIE 12/13 - The graphs that compare UHI with percentage area of urban tree canopy and of impervious surfaces seems quite compelling. This makes sense, and it's intersting to notice how not a lot of the demographic stuff doesn't seem to show up in EDA but the landcover stuff seem like promising predictors.
+STEPHANIE 12/13 - The graphs that compare UHI with percentage area of urban tree canopy and of impervious surfaces seems quite compelling. This makes sense, and it's interesting to notice how not a lot of the demographic stuff doesn't seem to show up in EDA but the landcover stuff seem like promising predictors.
 
 ## Preparation for Modeling
 STEPHANIE 12/13 - I added "-tract" and "-ward" to remove more geographic indicators that likely would affect the model, since that otherwise would've been a main predictor of a hotspot
