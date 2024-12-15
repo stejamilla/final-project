@@ -1006,23 +1006,29 @@ dt_predictions |>
 ### Creating confusion matrix
 ```{r}
 
+# Transforming the hotspot variable to become a factor variable
 dt_predictions$hotspot <- as.factor(dt_predictions$hotspot)
 
+# Creating confusion matrix
 conf_mat(data = dt_predictions,
          truth = hotspot,
          estimate = .pred_class)
 
 ```
 
-Calculating precision and recall/sensitivity:
+Calculating accuracy, precision, and recall/sensitivity:
 ```{r}
 
-precision(data = predictions,
-          truth = grade,
+accuracy(data = dt_predictions,
+          truth = hotspot,
           estimate = .pred_class)
 
-recall(data = predictions,
-     truth = grade,
+precision(data = dt_predictions,
+          truth = hotspot,
+          estimate = .pred_class)
+
+recall(data = dt_predictions,
+     truth = hotspot,
      estimate = .pred_class)
 
 ```
