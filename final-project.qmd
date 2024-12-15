@@ -376,15 +376,30 @@ mean_imputed_hhi |>
 acs_data <- acs_data |>
   left_join(tract_data, by = "tract") |>
   # Rent burden
-  mutate(rent_burden_pct = if_else(
-    is.na(rent_burden_pct), rb_tract, rent_burden_pct)
+  mutate(
+    # Create indicator for imputed vars
+    rb_imputed = if_else(
+      is.na(rent_burden_pct), 1, 0),
+    # Tract-level imputation
+    rent_burden_pct = if_else(
+      is.na(rent_burden_pct), rb_tract, rent_burden_pct)
   ) |>
   # Median HHI
-  mutate(med_hhi = if_else(
+  mutate(
+    # Create indicator for imputed vars
+    hhi_imputed = if_else(
+      med_hhi < 0, 1, 0),
+    # Tract-level imputation
+    med_hhi = if_else(
     med_hhi < 0, hhi_tract, med_hhi)
   ) |>
   # Median property value
-  mutate(med_prop_val = if_else(
+  mutate(
+    # Create indicator for imputed vars
+    propval_imputed = if_else(
+      med_prop_val < 0, 1, 0),
+    # Tract-level imputation
+    med_prop_val = if_else(
     med_prop_val < 0, propval_tract, med_prop_val)
   )
 
@@ -510,7 +525,7 @@ dc_full_data <- dc_full_data |>
   
 # Drop columns no longer needed
 dc_full_data <- dc_full_data |>
-  select(-c(rb_tract, rb_ward, 
+  select(-c(rb_tract, rb_ward,
             hhi_tract, hhi_ward,
             propval_tract, propval_ward))
 
@@ -613,6 +628,114 @@ dc_full_data <- dc_full_data|>
   relocate(total_pop:hotspot, .after = tract)
 
 ```
+
+
+### Evaluating imputation via visualization
+
+Missing data have been imputed using the next smallest geography available. In order to assess the accuracy of these imputations, we plot the variables with imputed values against another variable with no imputed values, one which should have some correlation with the partially imputed variable. We can then see if the imputed values follow the general trend of the correlation or not.
+
+```{r}
+#| label: "Evaluating imputation"
+
+#### PERCENT RENT BURDENED ####
+
+# It was harder finding variables that are clearly correlated with this than it 
+# was for some of the other partially-imputed variables. These are the most
+# useful results I got.
+
+# % rent burdened vs. POC ratio
+dc_full_data |> ggplot() +
+  geom_point(mapping =
+    aes(x = ed_bach_ratio, y = rent_burden_pct,
+        color = as.character(rb_imputed))
+  ) +
+  labs(color = "imputed (0 = no, 1 = yes)")
+# Not a super strong trend here, but all imputed data points seem to fit
+# the general shape of the data.
+
+# % rent burdened vs. ward
+dc_full_data |> ggplot() +
+  geom_point(mapping =
+    aes(x = ward, y = rent_burden_pct,
+        color = as.character(rb_imputed))
+  ) +
+  labs(color = "imputed (0 = no, 1 = yes)")
+# All the outliers here (rent_burden_pct = 1 or = 0) are not imputed values.
+# Wouldn't want to rely on this alone since we impute using ward-level means
+# in a few cases, but alongside the other charts, it provides further reassurance.
+
+
+#### MEDIAN HOUSEHOLD INCOME ####
+
+# Median household income vs. POC ratio
+dc_full_data |> ggplot() +
+  geom_point(mapping =
+    aes(x = race_poc_ratio, y = med_hhi,
+        color = as.character(hhi_imputed))
+  ) +
+  labs(color = "imputed (0 = no, 1 = yes)")
+# This looks pretty promising to me in terms of the imputed values being reasonable
+# One or two semi-outliers, but imputed values generally follow trend of other data
+# Don't think we need to worry too much about values where x = 0;
+# these likely had no population data or actually no population
+
+dc_full_data |> ggplot() +
+  geom_point(mapping =
+    aes(x = race_poc_ratio, y = med_hhi,
+        color = as.character(hhi_imputed))
+  )
+# Median household income vs. bachelor's degree ratio
+dc_full_data |> ggplot() +
+  geom_point(mapping =
+    aes(x = ed_bach_ratio, y = med_hhi,
+        color = as.character(hhi_imputed))
+  ) +
+  labs(color = "imputed (0 = no, 1 = yes)")
+# The outlier here is really just an outlier on in terms of ed_bach_ratio.
+# Arguably the imputed med_hhi should have been higher, but not sure how much
+# of an issue this is considering it's only one data point.
+
+# Median household income vs. ward
+dc_full_data |> ggplot() +
+  geom_point(mapping =
+    aes(x = ward, y = med_hhi,
+        color = as.character(hhi_imputed))
+  )
+# This looks good to me too. Really no imputed values are outliers in their ward.
+
+
+#### MEDIAN PROPERTY VALUE ####
+
+# Median property value vs. POC ratio
+dc_full_data |> ggplot() +
+  geom_point(mapping =
+    aes(x = race_poc_ratio, y = med_prop_val,
+        color = as.character(propval_imputed))
+  ) +
+  labs(color = "imputed (0 = no, 1 = yes)")
+# Imputed values seem to fit trend of data quite well.
+
+# Median property value vs. bachelor's degree ratio
+dc_full_data |> ggplot() +
+  geom_point(mapping =
+    aes(x = ed_bach_ratio, y = med_prop_val,
+        color = as.character(propval_imputed))
+  ) +
+  labs(color = "imputed (0 = no, 1 = yes)")
+# Slightly weirdly shaped data, but the imputed points do not seem to be
+# outside the trend. Only outlier is on the ed_bach_ratio var.
+
+# Median property value vs. ward
+dc_full_data |> ggplot() +
+  geom_point(mapping =
+    aes(x = ward, y = med_prop_val,
+        color = as.character(propval_imputed))
+  ) +
+  labs(color = "imputed (0 = no, 1 = yes)")
+# No imputed values are outliers in their ward.
+
+```
+
 
 ## Prepare the data for analysis (set seed & splitting)
 
