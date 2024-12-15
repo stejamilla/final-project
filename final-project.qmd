@@ -921,6 +921,113 @@ canopy_map + planting_map + impervious_map + housing_map
 
 ```
 
+## Evaluating the Model
+
+STEPHANIE 12/15 - Adding this evaluation in since we need to assess the decision tree model on its own (can't really compare it to rf and lm since they have different outcome variables).
+
+### Creating predictions
+
+```{r}
+# Ensuring the testing dataset has the same variables as the training dataset
+dc_test <- dc_test |>
+  st_drop_geometry() |>
+  select(
+    # remove identifying vars
+    -block_group,
+    -intptlat,
+    -intptlon,
+    -gis_id,
+    -globalid, gid,
+    -tract,
+    -ward,
+    -block_group_temp,
+    # remove raw total pop var (custom pop density and other pop proportion
+    # vars remain)
+    -total_pop,
+    # remove raw race vars (custom proportion vars remain)
+    -race_white,
+    -race_black,
+    -race_ai_an,
+    -race_asian,
+    -race_nh_pi,
+    -race_oth_mult,
+    -race_eth_hisp,
+    # remove raw ed vars (custom proportion vars remain)
+    -ed_doct,
+    -ed_prof_deg,
+    -ed_master,
+    -ed_bach,
+    -ed_assoc,
+    -ed_reg_hsd,
+    -ed_ged,
+    -ed_comb_hsd,
+    -ed_comb_adv_deg,
+    # remove duplicative housing data (custom proportion vars and pct var
+    # remain)
+    -total_hous_units,
+    -occ_units,
+    -vac_units,
+    # remove duplicative land data (custom proportion / "pct" vars remain)
+    -ends_with("_ac"),
+    -total_sq_mi,
+    -water_sq_mi,
+    -wtr_pct,
+    -aland,
+    -awater,
+    -utcac0620,
+    -utcac1120,
+    -utcac1520,
+    -utcpct0620,
+    -utcpct1120,
+    -utc_pct_06,
+    -utc_pct_11,
+    -utc_pct_15,
+    # remove pop_density_water_sq_mi due to INF value for most records 
+    -pop_density_water_sq_mi) 
+
+# Creating predictions dataset
+dt_predictions <- bind_cols(
+  dc_test,
+  predict(object = dt_fitting, new_data = dc_test),
+  predict(object = dt_fitting, new_data = dc_test, type = "prob")
+) 
+
+# Editing column names so it's readable
+names(dt_predictions) <- names(dt_predictions) |>
+  str_replace(" ", "_")
+
+# Printing a few predictions
+dt_predictions |>
+  select(hotspot, .pred_class, .pred_hotspot, .pred_not_hotspot) |>
+  print(n = 20)
+
+```
+
+### Creating confusion matrix
+```{r}
+
+dt_predictions$hotspot <- as.factor(dt_predictions$hotspot)
+
+conf_mat(data = dt_predictions,
+         truth = hotspot,
+         estimate = .pred_class)
+
+```
+
+Calculating precision and recall/sensitivity:
+```{r}
+
+precision(data = predictions,
+          truth = grade,
+          estimate = .pred_class)
+
+recall(data = predictions,
+     truth = grade,
+     estimate = .pred_class)
+
+```
+
+
 # Linear Regression
 
 JAMIE 12/12 - Added recipe for lm and rf and added lm model and fit below. Having trouble with this major warning:
