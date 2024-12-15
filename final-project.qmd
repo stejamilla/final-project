@@ -240,8 +240,7 @@ names(acs_data) <- acs_matrix[1, ] |>
 
 ```
 
-Labeling and cleaning ACS variables
-
+Labeling and cleaning ACS variables:
 ```{r}
 #| label: "Cleaning ACS data"
 
@@ -308,6 +307,8 @@ acs_data <- acs_data |>
          )
 ```
 
+### Data Imputation Part 1
+
 IMPUTATION
 The imputation logic works as follows:
 1) If data is missing at the block group level, use the mean for that block group's census tract.
@@ -327,10 +328,10 @@ Imputation part 1: replace missing data points with tract-level data.
 # Create tract dataframe
 tract_data <- acs_data |>
   mutate(med_hhi = if_else(
-          med_hhi < 0, NA, med_hhi),
-         med_prop_val = if_else(
-           med_prop_val < 0, NA, med_prop_val)
-         ) |>
+    med_hhi < 0, NA, med_hhi),
+    med_prop_val = if_else(
+      med_prop_val < 0, NA, med_prop_val)
+  ) |>
   group_by(tract) |>
   summarize(
     rb_tract = mean(rent_burden_pct, na.rm = TRUE),
@@ -396,6 +397,7 @@ MADELEINE 12/14: Commenting this error codes section out since imputation remove
 
 STEPHANIE 12/13 - I had to move this up and change the dataset from dc_train to landcover because we have to show how we determine the threshold before using mutate on it in the following code chunk.
 
+## Deciding threshold for hotspot vs. not hotspot
 Deciding the threshold for hot vs. not hot:
 ```{r}
 
@@ -436,21 +438,8 @@ heat_freq |>
 
 ```
 
-STEPHANIE 12/13 - There's something odd happening with race_eth_hisp_ratio, because I'm looking at the training data and the values are all 1 (or NaN), which presumably means that the population share of hispanic/latino is 100% for each block group, which presumably wouldn't happen??
-
-MADELEINE 12/14 - I figured this out and fixed it; we were pulling the total population from the ethnicity table, which is just equal to the total population overall. It should now be pulling the actual Hispanic/Latino count
-
-Threshold for "hotspot": 
-
-STEPHANIE 12/13
-Did we want to go with 25% for hotspot vs 75%? I'm fine to change the threshold, we'll just have to justify which level to go for.
-
-MADELEINE 12/14: I am trying a new approach using 1 standard deviation above the mean, which makes the cutoff temp 91.6 F.
-
-(STEPHANIE?)
-I've taken care of all the NaN values but haven't dealt with the NA values which I've found in the following columns: med_hhi, med_prop_val, med_gross_rent, med_rent_pct_inc, income_home_val_ratio.
-
 MADELEINE 12/14: I split up the join from the metrics because the ward-level imputation has to happen in between (after join, before metrics).
+
 ```{r}
 #| label: "Create final dataset"
 
@@ -458,6 +447,7 @@ dc_full_data <- left_join(landcover, acs_data, by = "block_group")
 
 ```
 
+### Data Imputation Part 2
 Imputation part 2: for any data points still missing after imputing on tract level, impute on ward level
 
 ```{r}
@@ -486,7 +476,6 @@ dc_full_data <- dc_full_data |>
       is.na(propval_tract), propval_ward, med_prop_val)
     )
   
-
 # Drop columns no longer needed
 dc_full_data <- dc_full_data |>
   select(-c(rb_tract, rb_ward, 
@@ -591,8 +580,6 @@ dc_full_data <- dc_full_data|>
   relocate(total_pop:hotspot, .after = tract)
 
 ```
-
-
 
 ## Prepare the data for analysis (set seed & splitting)
 
@@ -730,7 +717,6 @@ dc_train |>
   geom_point(alpha = 0.5) +
   theme_minimal()
 
-
 ```
 
 Temperature & landcover
@@ -755,7 +741,6 @@ dc_train |>
   geom_point(alpha = 0.5) +
   theme_minimal()
 
-
 ```
 
 STEPHANIE 12/13 - The graphs that compare UHI with percentage area of urban tree canopy and of impervious surfaces seems quite compelling. This makes sense, and it's interesting to notice how not a lot of the demographic stuff doesn't seem to show up in EDA but the landcover stuff seem like promising predictors.
@@ -768,6 +753,9 @@ STEPHANIE 12/13 - I think yes, we'll have to use it, especially for hyper parame
 JAMIE 12/13 - Relocated these steps per discussion.
 
 MADELEINE 12/14 - should hotspot be kept in here? there is a comment saying "remove duplicative hotspot", but then the next code chunk seems to need it
+
+STEPHANIE 12/15 - that's a good point, Madeleine; we'll have to remove it for lm and rf but need to keep it in for decision tree
+
 ```{r}
 
 # Prep the dataset for modeling
@@ -824,8 +812,6 @@ dc_train <- dc_train |>
     -utc_pct_06,
     -utc_pct_11,
     -utc_pct_15,
-    # remove duplicative hotspot
-    -hotspot,
     # remove pop_density_water_sq_mi due to INF value for most records 
     -pop_density_water_sq_mi) 
 
@@ -834,12 +820,9 @@ dc_folds <- vfold_cv(data = dc_train, v = 10)
 
 ```
 
-JAMIE 12/12 - Changing the dataset used in the recipe to dc_train rather than the full df
-* In the recipe for the lm and rf models, I included a lot of variables in step_rm. Wanted to get your thoughts on these before I added them here too...Just removed uhi and pop_density_water_sq_mi for now.
+# Decision Tree
 
-STEPHANIE 12/13 - I think what you removed here is fine. I've decided to keep in downsampling because I think it's useful. For reference, down-sampling "randomly subset all the classes in the training set so that their class frequencies match the least prevalent class. For example, suppose that 80% of the training set samples are the first class and the remaining 20% are in the second class. Down-sampling would randomly sample the first class to be the same size as the second class (so that only 40% of the total training set is used to fit the model)."
-
-## Decision Tree
+## Modeling
 
 ```{r}
 
@@ -864,10 +847,13 @@ rpart.plot::rpart.plot(x = dt_fitting$fit$fit$fit,
                        roundint = FALSE)
 
 ```
-STEPHANIE 12/13 - 
-I think we have an interesting model. The first decision point is whether the percentage of the block group that's unsuitable for planting; if it's lower than 44% then it's not a hotspot. If it is greater than or equal to 44%, then you check if it's greater than or equal to 55%; if it is then it's a hotspot. If it's not then you check if the total acre area of buildings, and if it's less than 6.4 acres, then it's not a hotspot. If it is, then you check the percentage of area that's a parking lot. If it's greater than or equal to 1.6%, then it's a hotspot. 
+STEPHANIE 12/15 - Retaining comments for write-up in case we want to utilize them:
 
-Notably there's no demographic indicators here, it's all land cover based. Part of me wonders if we should take out the total area (_ac) variables, but I think it's kinda interesting keeping it in. I wonder why total area became a decision branch rather than the percentage version.
+Note on results:
+I think we have an interesting model. The first decision point is whether the percentage of the block group that's covered by tree canopy; if it's greater or equal to 23% then it's not a hotspot. If it is less than 23%, then you check how suitable the block group is for tree planting "based on a weighted formula that includes all planting prioritization categories." If the score is less than 7, then it's a not hotspot. If it's greater than or equal to seven, you check the percent of total area that's covered by all combined impervious surfaces. If the percentage is less than 66%, then it's not a hotspot. If it's greater than or equal to 66%, then the final check is whether the number of housing units per person is less than 0.74. If it's greater than or equal to 0.75, then it's not a hotspot. If it is less than 0.74 then it is a hotspot.
+
+Note on methods:
+STEPHANIE 12/13 - I've decided to keep in downsampling because I think it's useful. For reference, down-sampling "randomly subset all the classes in the training set so that their class frequencies match the least prevalent class. For example, suppose that 80% of the training set samples are the first class and the remaining 20% are in the second class. Down-sampling would randomly sample the first class to be the same size as the second class (so that only 40% of the total training set is used to fit the model)."
 
 ## Visualizing Important Variables
 
@@ -935,6 +921,8 @@ I removed the identifying factor variables becuase I had to remove them earlier 
 # Create recipe for use in linear regression and random forest models
 # Create the recipe
 dc_recipe <- recipe(formula = uhi ~ ., data = dc_train) |>
+  # remove duplicative hotspot 
+  step_rm(hotspot) |>
   # Removing predictors that have near zero variability
   step_nzv(all_predictors()) |>
   # Removing predictors that are highly correlated with others
@@ -945,6 +933,8 @@ dc_recipe <- recipe(formula = uhi ~ ., data = dc_train) |>
 ## Modelling
 
 ```{r}
+
+d
 
 # Linear regression model
 dc_lm_model <- 
