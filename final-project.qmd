@@ -40,6 +40,7 @@ library(kableExtra)
 library(data.table)
 library(patchwork)
 library(vip)
+library(Metrics)
 
 # Clone the private github repository for this assignment using SSH link:
 # git@github.com:stejamilla/final-project.git
@@ -948,8 +949,14 @@ STEPHANIE 12/13 - I've decided to keep in downsampling because I think it's usef
 
 STEPHANIE 12/13 - Using dc_full_data as the dataset since it's possible we may accidentally do data leakage when mapping dc_train because we'll notice which block groups were excluded.
 
+STEPHANIE 12/16 - I'm realizing I made a mistake, I visualized not the most important variables but the ones represented in the decision tree (which are actually different from the most important variables...I've put that code in mute below). I think both are valid but curious if we should plot the top most important variables instead of the variables in the decision tree nodes?
+
 ```{r fig.width = 9, fig.height = 8}
 #| label: "Mapping important variables"
+
+#dt_fitting |>
+ # extract_fit_parsnip() |>
+  # vip(num_features = 10)
 
 canopy_map <- dc_full_data |> ggplot() +
   geom_sf(aes(fill = utc_pct)) +
@@ -1130,13 +1137,6 @@ Accuracy and recall are relatively high at 87.9% and 94.1%, respectively. This m
 
 # Linear Regression
 
-JAMIE 12/12 - Added recipe for lm and rf and added lm model and fit below. Having trouble with this major warning:
-A | warning: prediction from rank-deficient fit; consider predict(., rankdeficient="NA")
-Also, I experimented here with removing all the columns that seemed duplicative. I did not add this to the dt recipe for now. Let me know what you all think of removing these.
-
-STEPHANIE 12/13 - The main issue are the columns that have NA values. We need to decide if we should remove those or if it's possible for us to do data imputation aka decide what those values should be.
-I removed the identifying factor variables becuase I had to remove them earlier from dc_train.
-
 ```{r}
 #| label: "Recipe for LM and RF models"
 
@@ -1171,12 +1171,14 @@ dc_lm_workflow <-
   
 unloadNamespace("Metrics")
 
+# Setting up resamples for later evaluation
 dc_lm_resamples <- dc_lm_workflow |>
   fit_resamples(resamples = dc_folds)
 
 ```
 
 STEPHANIE 12/15 - I took out fitting the model because we only really have to fit the best model between linear regression and random forests, since the purpose of fitting the model is to then create predictions from it, and we'd only want to create predictions based on the best model.
+Also, I'm not sure what we mean by line 1165 (unloadNamespace("Metrics")).
 
 # Random Forests
 
@@ -1186,7 +1188,6 @@ STEPHANIE 12/15 - I took out fitting the model because we only really have to fi
 
 ```{r}
 #| label: "Hyperparameter tuning"
-
 
 dc_rf_model <- 
   rand_forest(
@@ -1225,13 +1226,14 @@ rf_resamples <- tune_grid(
   grid = dc_rf_grid
 )
 
-# Showing the best hyperparameters
+# Showing the best hyperparameters based on model performance
 show_best(rf_resamples)
 
 ```
+Based on hyperparameter tuning, the best random forest model uses mtry = 15 and min_n = 11.
 
 STEPHANIE 12/15 - I took out the kable() argument from the line of code when we make dc_rf_grid becuase we don't really need to see the grid at that point; what matters is the last line of code when you show which hyperparameters are the best ones to use.
-It looks like mtry = 15 and min_n = 4 are the best options.
+It looks like mtry = 15 and min_n = 11 are the best options.
 
 ### Implementing best hyperparameters based on tuning
 
@@ -1242,7 +1244,7 @@ It looks like mtry = 15 and min_n = 4 are the best options.
 dc_rf_model <- rand_forest(
   trees = 200,
   mtry = 15,
-  min_n = 4
+  min_n = 11
 ) |>
   set_mode(mode = "regression") |>
   set_engine(
@@ -1304,16 +1306,100 @@ bind_rows(
 
 STEPHANIE 12/15 - Based on this, it seems that linear regression is the better model over random forests by a fairly large margin, which I find interesting since I think usually random forest models out perform other models like lm and regression trees?
 
+# Implement the Final Model
+
+STEPHANIE 12/13 - Setting up the final code block for when we decide which model we should make predictions from. This probably won't render because the random forest model isn't working at the time I'm writing this (7pm) 
+MADELEINE 12/15 - not sure if more needs to be done here, but when I just replace the argument of extract_workflow with dc_lm_model, I get two errors. 1) select(-hotspot): hotspot does not exist. 2) no applicable method for 'extract_workflow' applied to an object of class "c('linear_reg', 'model_spec')"
+Setting to not evaluate for now
+STEPHANIE 12/16 - I've edited this code so that it should work now.
+
+```{r}
+#| label: "Implement final model"
+
+# Removing hotspot variable to be consistent with the recipe 
+dc_test <- dc_test |>
+  select(-hotspot)
+
+# Selecting the best resamples via select_best
+lm_best <- dc_lm_resamples |>
+  select_best(metric = "rmse")
+
+# Finalizing the workflow with finalize_workflow
+lm_final <- finalize_workflow(
+  dc_lm_workflow,
+  parameters = lm_best
+)
+
+# Fitting the model on all the data
+lm_final_fit <- 
+  lm_final |>
+  last_fit(dc_split) 
+
+# Collecting metrics for RMSE
+lm_final_fit |>
+  collect_metrics() |>
+  filter(.metric == "rmse")
+
+# making predictions with the testing data
+lm_predictions <- bind_cols(
+  dc_test,
+  predict(object = extract_workflow(lm_final_fit), 
+          new_data = dc_test) 
+)
+
+# Displaying the first 10 predictions against the actual values
+select(lm_predictions, uhi, starts_with(".pred"))
+
+# Interrogating which values were incorrectly predicted to the nearest tenth
+lm_predictions |>
+  select(uhi, .pred) |>
+  mutate(.pred = round(lm_predictions$.pred, 1),
+         uhi = round(lm_predictions$uhi, 1),
+         correct = if_else(.pred == uhi, "Yes", "No"
+         )) |>
+  count(correct)
+
+```
+STEPHANIE 12/16 - I'm a bit concerned how the regression model correctly predicts ALL uhi values when rounded to the nearest tenth...is this possible?! When you round to the nearest hundreth, it still gets 109 of 116 correct. But then by the thousandth it goes to only 73 correct.
+
+## Visualizing the most important predictors
+```{r}
+#| label: "Visualize most important predictors"
+#| eval: false
+
+lm_final_fit |>
+  extract_fit_parsnip() |>
+  vip(num_features = 20) 
+
+%>%
+  .$data |>
+  mutate(
+    Importance = Importance / max(Importance),
+    Variable = fct_reorder(.x = Importance, .f = Variable)
+  ) |>
+  ggplot(aes(Importance, Variable)) +
+  geom_col()
+
+```
+STEPHANIE 12/16 - Wow, it's kinda wild how it's really only seven variables of our 54 predictors that have large importance. I'm assuming that the other ones listed here are still somewhat important but maybe not enough for the bar to be visualized?
+
+
+STEPHANIE 12/13 - Then with the code chunk below, we should make some maps with the top ~3 variables as determined by the code chunk above
+```{r}
+
+
+
+```
+
 ## Estimate the out-of-sample error rate
 
 JAMIE 12/13 - Added metrics work below
 STEPHANIE 12/15 - Sorry for my ignorance, but I'm not entirely sure what we're doing here - is it finding another metric to compare models? Based on the RMSE values above, it seems we should go with the regression model and then create predictions with that and then visualize the best predictors.
 MADELEINE 12/15 - also, this chunk does not run because dc_lm_fit is not defined. Setting it to not evaluate for now
+STEPHANIE 12/16 - I've moved this below the creating predictions chunk. I think Jamie was on the right track in that we should calculate an error rate for the linear regression model, but I think this has to come after how we made predictions.
 
 ```{r}
 #| eval: false
-
-library(Metrics)
 
 # save best lm fit
 best_lm_fit <- fit_best(dc_lm_fit, verbose = TRUE)
@@ -1331,57 +1417,9 @@ kable(rmse(actual = test_predictions$y, predicted = test_predictions$y_hat))
 
 ```
 
-# Implement the Final Model
+# Practical Use of the Model
 
-STEPHANIE 12/13 - Setting up the final code block for when we decide which model we should make predictions from. This probably won't render because the random forest model isn't working at the time I'm writing this (7pm) 
-MADELEINE 12/15 - not sure if more needs to be done here, but when I just replace the argument of extract_workflow with dc_lm_model, I get two errors. 1) select(-hotspot): hotspot does not exist. 2) no applicable method for 'extract_workflow' applied to an object of class "c('linear_reg', 'model_spec')"
-Setting to not evaluate for now
-
-```{r}
-#| label: "Implement final model"
-#| eval: false
-
-# Removing hotspot variable to be consistent with the recipe 
-dc_test <- dc_test |>
-  select(-hotspot)
-
-pred_test <- bind_cols(
-  dc_test,
-  predict(object = extract_workflow(#replace with best fitting model), 
-          new_data = dc_test)
-  )
-)
-
-select(pred_test, uhi, starts_with(".pred")) |>
-  print(n = 20)
-
-```
-
-MADELEINE 12/15: setting this to not evaluate for now since it's blocking rendering
-## Visualizing the most important predictors
-```{r}
-#| label: "Visualize most important predictors"
-#| eval: false
-
-#insert the best fitted model |>
-  extract_fit_parsnip() |>
-  vip(num_features = 20) %>%
-  .$data |>
-  mutate(
-    Importance = Importance / max(Importance),
-    Variable = fct_reorder(.x = Importance, .f = Variable)
-  ) |>
-  ggplot(aes(Importance, Variable)) +
-  geom_col()
-
-```
-
-STEPHANIE 12/13 - Then with the code chunk below, we should make some maps with the top ~3 variables as determined by the code chunk above
-```{r}
-
-
-
-```
+STEPHANIE 12/16 - We should write about how DC should use this model. I assume something along the lines of being able to predict which block groups are at most risk of becoming a hotspot based on its characteristics and as they change year over year. We just need to be careful to not fall into a correlation/causation mindset and say something like "these block groups should plant more trees!" since that's incorrect - modelling here isn't like the regression we've done in Quant classes.
 
 # Sources
 
