@@ -104,15 +104,19 @@ Categorizing each block group into their respective ward:
 landcover <- st_join(landcover, wards, largest = TRUE)
 
 # Mapping the overlapping wards & block groups
-ggplot() +
-  geom_sf(data = landcover,
-          aes(fill = ward))
-  
+landcover |>
+  mutate(ward = as.character(ward)) |>
+  ggplot() +
+  geom_sf(aes(fill = ward)) +
+  theme_void() +
+  labs(title = "Map of DC",
+       subtitle = "by Census Block Group & Ward",
+       fill = "Ward") 
 
 ```
 STEPHANIE 12/13 - this code says that if a ward intersects with a blockgroup, then classify that block group as a ward. For block groups that overlap multiple wards, it returns the ward that the block group overlaps with the most area (that's the argument largest = TRUE)
 
-## Exploring Census Demographic Data
+## Census Demographic Data
 
 Load ACS 5-yr 2016-2020 variables:
 
@@ -323,9 +327,7 @@ tract_data <- acs_data |>
     propval_tract = mean(med_prop_val, na.rm = TRUE)
   )
 
-
 # Replace missing data with tract data:
-  
 acs_data <- acs_data |>
   left_join(tract_data, by = "tract") |>
   # Rent burden
@@ -358,8 +360,6 @@ acs_data <- acs_data |>
 
 ```
 
-
-
 # Creating the Final Dataset for Analysis
 
 ## Deciding threshold for hotspot vs. not hotspot
@@ -373,29 +373,27 @@ landcover |>
   ggplot(aes(uhi)) +
   geom_histogram(aes(y = cumsum(..count..)))
 
-# Calculating frequency & cumulative frequency
+# Calculating / visualizing frequency & cumulative frequency
 heat_freq <- landcover |>
   count(uhi)
 
 heat_freq$cumulative <- cumsum(heat_freq$n)
 
-# Exploring other ways to generate a cutoff
+# Calculating the standard deviation and the mean of uhi
 heat_freq |> summarize(
   sd(uhi),
   mean(uhi)
 )
-# The standard deviation of UHI is 1.80
-# The mean is 89.8
-  # 1 SD above mean would be 91.6
 
+# Calculating how many block groups have one standard deviation above the mean
 heat_freq |>
   filter(uhi >= 91.6) |>
   count()
-  
-# 82 block groups have a UHI value at least one SD above the mean.
-```
 
-STEPHANIE 12/15 - I think doing one standard deviation makes sense. It didn't adversely affect the decision tree model at least, and probably makes more sense than just choosing the mid point.
+```
+The threshold for "hotspot" is having a uhi (average evening temperature) of 91.6 degrees Fahrenheit, which is one standard deviation (1.8 degrees) above the mean. This means that 82 of the 571 block groups (~14%) would be classified as a hotspot. We decided on this threshold with the belief that a hotspot should represent a blockgroup that meaningfully has an average higher temperature that the majority of the sample. Using standard deviation as a benchmark seemed to be an appropriate way to naturally divide the data.
+
+STEPHANIE 12/15: I for the life of me cannot find more information about the methodology of when the Portland State University SUPR Lab collected the temperature data for DC. According to this source (https://data.cityoftacoma.org/datasets/tacoma::urban-heat-island-uhi-index-2018-portland-state-university/about), they collected the Portland data on 7/25/18, so I must assume that DC was around the same time, but I can't find something online that confirms this.
 
 MADELEINE 12/14: I split up the join from the metrics because the ward-level imputation has to happen in between (after join, before metrics).
 
@@ -1386,5 +1384,7 @@ Census ACS 5yr 2016 - 2020
 https://www2.census.gov/programs-surveys/acs/tech_docs/accuracy/MultiyearACSAccuracyofData2020.pdf
 
 http://bit.ly/3DnlfIh
+
+https://climatecope.research.pdx.edu/ 
 
 
