@@ -681,7 +681,7 @@ dc_test <- testing(x = dc_split)
 
 ```
 
-# Initial Exploratory Data Analysis
+# Exploratory Data Analysis
 
 ## Review summary statistics
 
@@ -916,7 +916,7 @@ dc_folds <- vfold_cv(data = dc_train, v = 10)
 #| label: "Create decision tree model"
 
 dt_recipe <- recipe(formula = hotspot ~ ., data = dc_train) |>
-  # remove uhi var to avoid duplication of data from hotspot
+  # Remove uhi var to avoid duplication of data from hotspot
   step_rm(uhi) |>
   themis::step_downsample(hotspot) |> 
   step_nzv(all_numeric_predictors())
@@ -938,8 +938,8 @@ rpart.plot::rpart.plot(x = dt_fitting$fit$fit$fit,
 ```
 STEPHANIE 12/15 - Retaining comments for write-up in case we want to utilize them:
 
-Note on results:
-I think we have an interesting model. The first decision point is whether the percentage of the block group that's covered by tree canopy; if it's greater or equal to 23% then it's not a hotspot. If it is less than 23%, then you check how suitable the block group is for tree planting "based on a weighted formula that includes all planting prioritization categories." If the score is less than 7, then it's a not hotspot. If it's greater than or equal to seven, you check the percent of total area that's covered by all combined impervious surfaces. If the percentage is less than 66%, then it's not a hotspot. If it's greater than or equal to 66%, then the final check is whether the number of housing units per person is less than 0.74. If it's greater than or equal to 0.75, then it's not a hotspot. If it is less than 0.74 then it is a hotspot.
+Notes on results:
+I think we have an interesting model. The first decision point is whether the percentage of the block group that's covered by tree canopy; if it's greater or equal to 23% then it's not a hotspot. If it is less than 23%, then you check how suitable the block group is for tree planting "based on a weighted formula that includes all planting prioritization categories." If the score is less than 7, then it's a not hotspot. If it's greater than or equal to seven, you check the percent of total area that's covered by all combined impervious surfaces. If the percentage is less than 66%, then it's not a hotspot. If it's greater than or equal to 66%, then the final check is whether the number of housing units per person is less than 0.74. If it's greater than or equal to 0.75, then it's not a hotspot. If it is less than 0.74 then it is a hotspot. This last one is a bit odd because it's against what you think would happen...why would more housing units per person lead to cooler conditions? We could throw out some hypotheses here like since there are more housing units per person that means it's less densely occupied, so less heat?
 
 Note on methods:
 STEPHANIE 12/13 - I've decided to keep in downsampling because I think it's useful. For reference, down-sampling "randomly subset all the classes in the training set so that their class frequencies match the least prevalent class. For example, suppose that 80% of the training set samples are the first class and the remaining 20% are in the second class. Down-sampling would randomly sample the first class to be the same size as the second class (so that only 40% of the total training set is used to fit the model)."
@@ -948,7 +948,7 @@ STEPHANIE 12/13 - I've decided to keep in downsampling because I think it's usef
 
 STEPHANIE 12/13 - Using dc_full_data as the dataset since it's possible we may accidentally do data leakage when mapping dc_train because we'll notice which block groups were excluded.
 
-```{r fig.width = 8, fig.height = 8}
+```{r fig.width = 9, fig.height = 8}
 #| label: "Mapping important variables"
 
 canopy_map <- dc_full_data |> ggplot() +
@@ -1113,7 +1113,6 @@ Calculating accuracy, precision, and recall/sensitivity:
 ```{r}
 #| label: "Calculating accuracy, precision, recall"
 
-
 accuracy(data = dt_predictions,
           truth = hotspot,
           estimate = .pred_class)
@@ -1127,7 +1126,7 @@ recall(data = dt_predictions,
      estimate = .pred_class)
 
 ```
-
+Accuracy and recall are relatively high at 87.9% and 94.1%, respectively. This means that the model works relatively well in correctly classifying whether or not a block group is a hotspot and in specifically correctly identifying hotspots when that block group actually is a hotspost. Precision is not as high at 55.2%, since there were 13 instances in which the model predicted a block group is a hotspot when in reality it was not one. One possible way to improve the model is to adjust the threshold used to determine whether a block group is a hotspot or not. Another idea may be to examine the predictors used and adjust which ones should be included or not. For example, we made an assumption that using percentage area of the landcover variables rather than the total area variables (e.g., we chose percentage of area covered by canopy rather than total area covered by canopy) to allow consistency across block groups who vary in total area size. Perhaps it would be worth investigating the performance of this model using the total area variables instead or even alongside the percentage variables.
 
 # Linear Regression
 
