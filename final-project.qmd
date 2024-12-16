@@ -393,7 +393,7 @@ heat_freq |>
 ```
 The threshold for "hotspot" is having a uhi (average evening temperature) of 91.6 degrees Fahrenheit, which is one standard deviation (1.8 degrees) above the mean. This means that 82 of the 571 block groups (~14%) would be classified as a hotspot. We decided on this threshold with the belief that a hotspot should represent a blockgroup that meaningfully has an average higher temperature that the majority of the sample. Using standard deviation as a benchmark seemed to be an appropriate way to naturally divide the data.
 
-STEPHANIE 12/15: I for the life of me cannot find more information about the methodology of when the Portland State University SUPR Lab collected the temperature data for DC. According to this source (https://data.cityoftacoma.org/datasets/tacoma::urban-heat-island-uhi-index-2018-portland-state-university/about), they collected the Portland data on 7/25/18, so I must assume that DC was around the same time, but I can't find something online that confirms this.
+STEPHANIE 12/16 - I for the life of me cannot find more information about the methodology of when the Portland State University SUPR Lab collected the temperature data for DC. According to this source (https://data.cityoftacoma.org/datasets/tacoma::urban-heat-island-uhi-index-2018-portland-state-university/about), they collected the Portland data on 7/25/18, so I must assume that DC was around the same time, but I can't find something online that confirms this.
 
 MADELEINE 12/14: I split up the join from the metrics because the ward-level imputation has to happen in between (after join, before metrics).
 
@@ -544,6 +544,10 @@ dc_full_data <- dc_full_data|>
 
 Missing data have been imputed using the next smallest geography available. In order to assess the accuracy of these imputations, we plot the variables with imputed values against another variable with no imputed values, one which should have some correlation with the partially imputed variable. We can then see if the imputed values follow the general trend of the correlation or not.
 
+STEPHANIE 12/16 - I'm torn between just choosing one visualization per imputated variable or keeping in all of these and then providing comments on each of them in the body of the Quarto doc (aka not using # in the code chunks). Either way, I think we should split up the below code chunks for each visualization we keep in and then provide a bit of commentary after each one for interpretation of the graph.
+
+I've also modeled a cleaned version of the evaluation data visualization for the code in the chunk after "# % rent burdened vs. POC ratio" which we can replicate for the visualizations we want to keep.
+
 ```{r}
 #| label: "Evaluating imputation"
 
@@ -557,9 +561,16 @@ Missing data have been imputed using the next smallest geography available. In o
 dc_full_data |> ggplot() +
   geom_point(mapping =
     aes(x = ed_bach_ratio, y = rent_burden_pct,
-        color = as.character(rb_imputed))
+        color = as.character(rb_imputed)),
+    alpha = 0.4
   ) +
-  labs(color = "imputed (0 = no, 1 = yes)")
+  scale_color_manual(labels = c("No", "Yes"), values = c("#2271B5", "#8E133B")) +
+  labs(title = "Evaluating Rent Burden Imputation",
+       subtitle = "Comparison with population with a Bachelor's degree",
+       color = "Imputed?") +
+  xlab("Proportion of Population with a Bachelor's Degree") +
+  ylab("Proportion of Households with Rent Burden") +
+  theme_minimal()
 # Not a super strong trend here, but all imputed data points seem to fit
 # the general shape of the data.
 
