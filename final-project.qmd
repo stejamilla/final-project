@@ -120,9 +120,6 @@ Load ACS 5-yr 2016-2020 variables:
 acs_variables_bg <- load_variables(2020, "acs5") |>
   filter(geography == "block group")
 
-acs_variables_tract <- load_variables(2020, "acs5") |>
-  filter(geography == "tract")
-
 ```
 
 
@@ -345,7 +342,7 @@ tract_data <- acs_data |>
     propval_tract = mean(med_prop_val, na.rm = TRUE)
   )
 
-# Evaluating mean imputation
+# Delete? Evaluating mean imputation
 mean_imputed_hhi <- acs_data |>
   left_join(tract_data, by = "tract") |>
   mutate(
@@ -494,7 +491,7 @@ dc_full_data <- left_join(landcover, acs_data, by = "block_group")
 
 ```
 
-### Data Imputation Part 2
+## Data Imputation Part 2
 
 Imputation part 2: for any data points still missing after imputing on tract level, impute on ward level
 ```{r}
@@ -629,8 +626,7 @@ dc_full_data <- dc_full_data|>
 
 ```
 
-
-### Evaluating imputation via visualization
+## Evaluating imputation via visualization
 
 Missing data have been imputed using the next smallest geography available. In order to assess the accuracy of these imputations, we plot the variables with imputed values against another variable with no imputed values, one which should have some correlation with the partially imputed variable. We can then see if the imputed values follow the general trend of the correlation or not.
 
@@ -663,7 +659,6 @@ dc_full_data |> ggplot() +
 # All the outliers here (rent_burden_pct = 1 or = 0) are not imputed values.
 # Wouldn't want to rely on this alone since we impute using ward-level means
 # in a few cases, but alongside the other charts, it provides further reassurance.
-
 
 #### MEDIAN HOUSEHOLD INCOME ####
 
@@ -1399,6 +1394,7 @@ pred_test <- bind_cols(
   dc_test,
   predict(object = extract_workflow(#fill in with fitted model either lm or rf), 
           new_data = dc_test)
+  )
 )
 
 select(pred_test, uhi, starts_with(".pred")) |>
