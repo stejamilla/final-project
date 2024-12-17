@@ -1,0 +1,1440 @@
+---
+title: "Final Project"
+subtitle: "Data Science for Public Policy"
+author: "Madeleine Adelson, Stephanie Jamilla, Jamie Jelly Murtha"
+format: 
+  html:
+    code-line-numbers: true
+    body-width: 1600px
+embed-resources: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  warning: false
+urlcolor: blue
+toc: true
+---
+
+# About This Project
+Urban environments tend to retain heat due to having less tree/vegetation cover, more impervious surfaces such as asphalt, and other factors. Using data on DC's landcover, we built and tested three different models to predict where hotspots are most likely to occur within the District. We also included several variables from the American Community Survey (ACS) to test whether demographic characteristics could also be predictive of hotspots. Our analysis is at the block group level.
+
+# Setup
+
+Loading packages:
+```{r}
+#| label: "Packages"
+#| output: false
+
+library(dotenv)
+library(tidyverse)
+library(ggplot2)
+library(sf)
+library(tidycensus)
+library(stringr)
+library(magrittr)
+library(jsonlite)
+library(httr)
+library(tidymodels)
+library(knitr)
+library(kableExtra)
+library(data.table)
+library(patchwork)
+library(vip)
+library(Metrics)
+
+# Clone the private github repository for this assignment using SSH link:
+# git@github.com:stejamilla/final-project.git
+
+# do not use scientific notation
+options(scipen = 999)
+
+```
+
+
+# Loading and Cleaning the Data
+
+## DC Land Cover Data
+
+Loading data from Open Data DC (landcover, ward geometry):
+
+```{r}
+#| label: "Tree Canopy & ward data"
+
+# Loading Urban Tree Canopy by Census Block Group (2020) data
+landcover <- read_sf(paste0("data/Urban_Tree_Canopy",
+                            "_by_Census_Block_Group_in_2020.shp")) |>
+  rename(block_group = GEOID) |>
+  mutate(block_group = as.character(block_group)) |>
+  mutate(OBJECTID = as.character(OBJECTID)) |>
+  rename_all(tolower) |>
+  relocate(block_group, .after = objectid) |>
+  # Converting UHI to Fahrenheit
+  mutate(uhi = (uhi*(9/5) + 32))
+
+# Loading DC Ward data from Urban Tree Canopy by Ward (2020)
+wards <- read_sf("data/Urban_Tree_Canopy_by_Ward_in_2020.shp") |>
+  rename_all(tolower) |>
+  select(ward) |>
+  st_transform(crs = st_crs(landcover))
+
+```
+
+Create key with Urban Tree Canopy data column descriptions and clean up:
+
+```{r}
+#| label: "Landcover key"
+
+landcover_key <- read_csv("data/Urban_Tree_Canopy_Descriptions.csv",
+                          col_names = FALSE) |>
+  mutate(X1 = str_remove_all(X1, "\\( type:.*alias:|, length:.*| \\)")) |>
+  separate(col = X1,
+           into = c("field", "description"),
+           sep = " ",
+           extra = "merge") |>
+  mutate(field = tolower(field))
+
+```
+
+Categorizing each block group into their respective ward:
+
+```{r}
+#| label: "Spatial join landcover and wards"
+
+# Spatial join so that each block group is assigned a ward based on majority
+# area of a block group within a ward
+landcover <- st_join(landcover, wards, largest = TRUE)
+
+# Mapping the overlapping wards & block groups
+landcover |>
+  mutate(ward = as.character(ward)) |>
+  ggplot() +
+  geom_sf(aes(fill = ward)) +
+  theme_void() +
+  labs(title = "Map of DC",
+       subtitle = "by Census Block Group & Ward",
+       fill = "Ward") 
+
+```
+STEPHANIE 12/13 - this code says that if a ward intersects with a blockgroup, then classify that block group as a ward. For block groups that overlap multiple wards, it returns the ward that the block group overlaps with the most area (that's the argument largest = TRUE)
+
+## Census Demographic Data
+
+Load ACS 5-yr 2016-2020 variables:
+
+```{r}
+#| label: "ACS variable list for exploration"
+
+acs_variables_bg <- load_variables(2020, "acs5") |>
+  filter(geography == "block group")
+
+```
+
+MADELEINE PRE-12/12:
+* It occurs to me we may need to choose baseline categories for any categorical variables we include and leave those out? Not sure if that is only a requirement for line and linear regression?
+JAMIE 12/12 - Good point! I'm adding stuff in below without factoring that in for now, but I think we def need to determine if we need to deal with this!
+STEPHANIE 12/13 - I'm not too concerned about this because we've never had to address categorical variables in the assignments. We can do something like "step_dummy()" if we want to recode a categorical variable into a dummy instead.
+
+### Loading Census demographic data via API
+
+```{r}
+#| label: "Load ACS data"
+
+
+# Secure Census API key (from .env file) for use in Census API call
+load_dot_env()
+credential <- Sys.getenv("census_api_key")
+
+# Create url for API call
+url <- str_glue(paste0("https://api.census.gov/data/2020/acs/acs5?get=",
+             # Description of data point
+             "NAME,",
+             # TOTAL POPULATION ESTIMATE
+             "B01003_001E,",
+             # TOTAL POPULATION BY RACE - WHITE ALONE
+             "B02001_002E,",
+             # TOTAL POPULATION BY RACE - BLACK OR AFR AMER ALONE
+             "B02001_003E,",
+             # TOTAL POPULATION BY RACE - AMER IND AND AK NAT ALONE
+             "B02001_004E,",
+             # TOTAL POPULATION BY RACE - ASIAN ALONE
+             "B02001_005E,",
+             # TOTAL POPULATION BY RACE - NAT HAW OR PAC ISL ALONE
+             "B02001_006E,",
+             # TOTAL POPULATION BY RACE - OTHER ALONE + TWO OR MORE RACES
+             "B02001_008E,",
+             # TOTAL HISPANIC OR LATINO
+             "B03003_003E,",
+             # TOTAL POP WITH DOCTORATE DEGREE
+             "B15003_025E,",
+             # TOTAL POP WITH PROFESSIONAL SCHOOL DEGREE
+             "B15003_024E,",
+             # TOTAL POP WITH MASTER'S DEGREE
+             "B15003_023E,",
+             # TOTAL POP WITH BACHELORS DEGREE
+             "B15003_022E,",
+             # TOTAL POP WITH ASSOCIATES DEGREE
+             "B15003_021E,",
+             # TOTAL POP WITH REGULAR HIGH SCHOOL DIPLOMA
+             "B15003_017E,",
+             # TOTAL POP WITH GED OR ALTERNATIVE CREDENTIAL
+             "B15003_018E,",
+             # MEDIAN HH INCOME IN PAST 12 MOS
+             "B19013_001E,",
+             # TOTAL HOUSING UNITS
+             "B25002_001E,",
+             # TOTAL OCCUPIED HOUSING UNITS
+             "B25002_002E,",
+             # TOTAL VACANT HOUSING UNITS
+             "B25002_003E,",
+             # MEDIAN PROPERTY VALUE
+             "B25077_001E,",
+             # GROSS RENT AS A % OF HH INCOME IN PAST 12 MO -
+             # TOTAL
+             "B25070_001E,",
+             # GROSS RENT AS A % OF HH INCOME IN PAST 12 MO -
+             # 30 TO 34.9 %
+             "B25070_007E,",
+             # GROSS RENT AS A % OF HH INCOME IN PAST 12 MO -
+             # 35 TO 39.9 %
+             "B25070_008E,",
+             # GROSS RENT AS A % OF HH INCOME IN PAST 12 MO -
+             # 40 TO 49.9 %
+             "B25070_009E,",
+             # GROSS RENT AS A % OF HH INCOME IN PAST 12 MO -
+             # 50 % or more
+             "B25070_010E",
+             # Limit to block-group-level data for DC
+             "&for=block%20group:*&for=tract:*&in=state:11&in=county:001"))
+
+# Use url to request data from API
+acs_json <- GET(url = url)
+
+# Check call status
+http_status(acs_json)
+
+# Save API JSON response as text
+acs_json <- content(acs_json, as = "text")
+
+# Save JSON as character matrix
+acs_matrix <- fromJSON(acs_json)
+
+# Convert matrix to tibble
+acs_data <- as_tibble(acs_matrix[2:nrow(acs_matrix), ],
+                      .name_repair = "minimal")
+
+# Add variable names to tibble
+names(acs_data) <- acs_matrix[1, ] |>
+  str_replace(" ", "_")
+
+```
+
+Labeling and cleaning ACS variables:
+```{r}
+#| label: "Cleaning ACS data"
+
+# Clean up ACS data
+acs_data <- acs_data |>
+  # Meaningful variable names
+  rename(total_pop = B01003_001E,
+         race_white = B02001_002E,
+         race_black = B02001_003E,
+         race_ai_an = B02001_004E,
+         race_asian = B02001_005E,
+         race_nh_pi = B02001_006E,
+         race_oth_mult = B02001_008E,
+         race_eth_hisp = B03003_003E,
+         ed_doct = B15003_025E,
+         ed_prof_deg = B15003_024E,
+         ed_master = B15003_023E,
+         ed_bach = B15003_022E,
+         ed_assoc = B15003_021E,
+         ed_ged = B15003_018E,
+         ed_reg_hsd = B15003_017E,
+         med_hhi = B19013_001E,
+         med_prop_val = B25077_001E,
+         rent_burden_tot = B25070_001E,
+         rent_burden_30_34 = B25070_007E,
+         rent_burden_35_39 = B25070_008E,
+         rent_burden_40_49 = B25070_009E,
+         rent_burden_50plus = B25070_010E,
+         total_hous_units = B25002_001E,
+         vac_units = B25002_003E,
+         occ_units = B25002_002E,
+         block_group_temp = block_group) |>
+  # Create block_group column to use for combining this with the other datasets
+  mutate(block_group = paste(state,
+                             county, 
+                             tract, 
+                             block_group_temp,
+                             sep = "")) |>
+  # Convert Census variables to numeric
+  mutate_at(vars(total_pop:rent_burden_50plus), as.numeric) |>
+  rename_all(tolower) |>
+  relocate(block_group, .before = name)
+
+
+# Convert rent burden variables into a percentage of rent burdened households,
+# then dropping original rent burden vars
+acs_data <- acs_data |> 
+  mutate(
+    rent_burden_sum = 
+      rent_burden_30_34 + 
+       rent_burden_35_39 + 
+       rent_burden_40_49 + 
+       rent_burden_50plus
+    ) |>
+  mutate(
+    rent_burden_pct = (rent_burden_sum / rent_burden_tot)
+    ) |>
+  select(-c(rent_burden_30_34, 
+            rent_burden_35_39, 
+            rent_burden_40_49, 
+            rent_burden_50plus,
+            rent_burden_tot,
+            rent_burden_sum)
+         )
+```
+
+### Data Imputation Part 1
+
+IMPUTATION
+The imputation logic works as follows:
+1) If data is missing at the block group level, use the mean for that block group's census tract.
+
+2) If data is still missing at the census tract level, use the mean for that census tract's ward. (This happens further down in the code.)
+
+This method is imperfect for two reasons:
+1) Imputed values at the census tract level feed into imputation at the ward level. For instance, say a ward is made up of 4 census tracts and each tract has 4 block groups. Initially, only 2/4 tracts have complete data. After imputing at the tract level, 3/4 are complete. When we go to impute the data for the final tract, that calculation will include the values we imputed for the other missing tract. I don't think this is that big of a deal, especially because the numbers of values that need to be imputed at the ward level is pretty small.
+
+2) Median household income and median property value are top- and bottom-coded (no one has an income less than $2,499 or greater than $250,000). The only way around this I can think of would be to choose one or more cutoffs as I did with the rent burden variable (for example, categorize income into "high income" and "low income"). I didn't do this because I wasn't sure what those cutoffs would be. I'm also not really sure how much it matters, since either way we can't capture the real high- and low-end incomes.
+--
+
+Imputation part 1: replace missing data points with tract-level data.
+
+```{r}
+#| label: "Imputation part 1"
+
+# Create tract dataframe
+tract_data <- acs_data |>
+  mutate(med_hhi = if_else(
+    med_hhi < 0, NA, med_hhi),
+    med_prop_val = if_else(
+      med_prop_val < 0, NA, med_prop_val)
+  ) |>
+  group_by(tract) |>
+  summarize(
+    rb_tract = mean(rent_burden_pct, na.rm = TRUE),
+    hhi_tract = mean(med_hhi, na.rm = TRUE),
+    propval_tract = mean(med_prop_val, na.rm = TRUE)
+  )
+
+# Replace missing data with tract data:
+acs_data <- acs_data |>
+  left_join(tract_data, by = "tract") |>
+  # Rent burden
+  mutate(
+    # Create indicator for imputed vars
+    rb_imputed = if_else(
+      is.na(rent_burden_pct), 1, 0),
+    # Tract-level imputation
+    rent_burden_pct = if_else(
+      is.na(rent_burden_pct), rb_tract, rent_burden_pct)
+  ) |>
+  # Median HHI
+  mutate(
+    # Create indicator for imputed vars
+    hhi_imputed = if_else(
+      med_hhi < 0, 1, 0),
+    # Tract-level imputation
+    med_hhi = if_else(
+    med_hhi < 0, hhi_tract, med_hhi)
+  ) |>
+  # Median property value
+  mutate(
+    # Create indicator for imputed vars
+    propval_imputed = if_else(
+      med_prop_val < 0, 1, 0),
+    # Tract-level imputation
+    med_prop_val = if_else(
+    med_prop_val < 0, propval_tract, med_prop_val)
+  )
+
+```
+
+# Creating the Final Dataset for Analysis
+
+## Deciding threshold for hotspot vs. not hotspot
+
+Deciding the threshold for hot vs. not hot:
+```{r}
+
+# Visualizing a cumulative histogram of counts of UHI values
+landcover |>
+  group_by(uhi) |>
+  ggplot(aes(uhi)) +
+  geom_histogram(aes(y = cumsum(..count..)))
+
+# Calculating / visualizing frequency & cumulative frequency
+heat_freq <- landcover |>
+  count(uhi)
+
+heat_freq$cumulative <- cumsum(heat_freq$n)
+
+# Calculating the standard deviation and the mean of uhi
+heat_freq |> summarize(
+  sd(uhi),
+  mean(uhi)
+)
+
+# Calculating how many block groups have one standard deviation above the mean
+heat_freq |>
+  filter(uhi >= 91.6) |>
+  count()
+
+```
+The threshold for "hotspot" is having a uhi (average evening temperature) of 91.6 degrees Fahrenheit, which is one standard deviation (1.8 degrees) above the mean. This means that 82 of the 571 block groups (~14%) would be classified as a hotspot. We decided on this threshold with the belief that a hotspot should represent a blockgroup that meaningfully has an average higher temperature that the majority of the sample. Using standard deviation as a benchmark seemed to be an appropriate way to naturally divide the data.
+
+STEPHANIE 12/16 - I for the life of me cannot find more information about the methodology of when the Portland State University SUPR Lab collected the temperature data for DC. According to this source (https://data.cityoftacoma.org/datasets/tacoma::urban-heat-island-uhi-index-2018-portland-state-university/about), they collected the Portland data on 7/25/18, so I must assume that DC was around the same time, but I can't find something online that confirms this.
+
+MADELEINE 12/14: I split up the join from the metrics because the ward-level imputation has to happen in between (after join, before metrics).
+
+```{r}
+#| label: "Create final dataset"
+
+dc_full_data <- left_join(landcover, acs_data, by = "block_group") 
+
+```
+
+## Data Imputation Part 2
+
+Imputation part 2: for any data points still missing after imputing at tract level, impute at ward level.
+
+```{r}
+#| label: "Imputation - ward level"
+
+# Create ward-level dataframe
+ward_data <- dc_full_data |>
+  group_by(ward) |>
+  summarize(
+    rb_ward = mean(rent_burden_pct, na.rm = TRUE),
+    hhi_ward = mean(med_hhi, na.rm = TRUE),
+    propval_ward = mean(med_prop_val, na.rm = TRUE)
+  ) |>
+  st_drop_geometry()
+
+# Replace missing data with ward data:
+# Rent burden
+dc_full_data <- dc_full_data |>
+  left_join(ward_data, by = "ward") |>
+  mutate(
+    rent_burden_pct = if_else(
+      is.na(rb_tract), rb_ward, rent_burden_pct),
+    med_hhi = if_else(
+      is.na(hhi_tract), hhi_ward, med_hhi),
+    med_prop_val = if_else(
+      is.na(propval_tract), propval_ward, med_prop_val)
+    )
+  
+# Drop columns no longer needed
+dc_full_data <- dc_full_data |>
+  select(-c(rb_tract, rb_ward,
+            hhi_tract, hhi_ward,
+            propval_tract, propval_ward))
+
+```
+
+## Finalizing full dataset
+
+```{r}
+#| label: "Create metrics"
+
+dc_full_data <- dc_full_data|>
+  mutate(
+    # convert total acres to sq miles
+    total_sq_mi = total_ac * 0.0015625,
+    # convert water acres to sq miles
+    water_sq_mi = wat_ac * 0.0015625,
+    # calculate water share of total sq miles
+    share_water_sq_mi = water_sq_mi / total_sq_mi,
+    # calculate population density per square mile
+    pop_dens_sq_mi = total_pop / total_sq_mi,
+    # calculate population density per water sq mile
+    pop_density_water_sq_mi = ifelse(
+      water_sq_mi !=0, total_pop / water_sq_mi, 0),
+    # calculate ratio of housing units to population
+    hous_units_per_person = ifelse(
+      total_hous_units != 0, total_hous_units / total_pop, 0),
+    # calculate ratio of vacant units to all units
+    vac_units_share = ifelse(
+      total_hous_units != 0, vac_units / total_hous_units, 0),
+    # calculate ratio of total income to median home value
+    inc_home_val_ratio = med_hhi / med_prop_val,
+    # create combined HS diploma or equivalent variable
+    ed_comb_hsd = ed_reg_hsd + ed_ged,
+    # create combined advanced post-undergraduate variable
+    ed_comb_adv_deg = ed_doct + ed_prof_deg + ed_master,
+    # calculate ratio of 25+ pop with HSD to total pop
+    ed_hsd_ratio = ifelse(
+      ed_comb_hsd !=0, ed_comb_hsd / total_pop, 0),
+    # calculate ratio of 25+ pop with bachelor's degree to total pop
+    ed_bach_ratio = ifelse(
+      ed_bach != 0, ed_bach / total_pop, 0),
+    # calculate ratio of 25+ pop with advanced post-bach degree to total pop
+    ed_adv_ratio = ifelse(
+      ed_comb_adv_deg != 0, ed_comb_adv_deg / total_pop, 0),
+    # calculate pop share white
+    race_white_ratio = ifelse(
+      race_white != 0, race_white / total_pop, 0),
+    # calculate pop share black or african american
+    race_black_ratio = ifelse(
+      race_black != 0, race_black / total_pop, 0),
+    # calculate pop share american indian or alaska native
+    race_ai_an_ratio = ifelse(
+      race_ai_an!= 0, race_ai_an / total_pop, 0),
+    # calculate pop share asian
+    race_asian_ratio = ifelse(
+      race_asian != 0, race_asian / total_pop, 0),
+    # calculate pop share native hawaiian or pacific islander
+    race_nh_pi_ratio = ifelse(
+      race_nh_pi != 0, race_nh_pi / total_pop, 0),
+    # calculate pop share two or more races
+    race_oth_mult_ratio = ifelse(
+      race_oth_mult != 0, race_oth_mult / total_pop, 0),
+    # calculate pop share hispanic or latino
+    race_eth_hisp_ratio = ifelse(
+      race_eth_hisp != 0, race_eth_hisp / total_pop, 0),
+    # calculate total non-white population
+    race_poc = race_black + race_ai_an + race_asian + race_nh_pi + race_oth_mult,
+    # calculate pop share non-white
+    race_poc_ratio = ifelse(
+      race_poc != 0, race_poc / total_pop, 0),
+    # creating hotspot var for decision tree model
+    hotspot = if_else(
+      uhi >= 91.6, "hotspot", "not hotspot"),
+    # remove factor from uhi var
+    uhi = as.numeric(as.character(uhi))) |>
+  relocate(c("block_group_temp", "tract"), .after = 2) |>
+  # remove columns with only one unique value
+  select(-objectid,
+         -name,
+         -state,
+         -statefp,
+         -county,
+         -countyfp,
+         -tractce,
+         -blkgrpce,
+         -namelsad,
+         -mtfcc,
+         -funcstat,
+         -field,
+         -shapearea,
+         -shapelen) |>
+  relocate(race_white_ratio:race_eth_hisp_ratio,
+           .after = race_eth_hisp) |>
+  relocate(ed_comb_hsd:ed_adv_ratio,
+           .after = ed_ged) |>
+  relocate(hous_units_per_person:inc_home_val_ratio,
+           .after = med_prop_val) |>
+  relocate(total_sq_mi:pop_density_water_sq_mi,
+           .after = inc_home_val_ratio) |>
+  relocate(total_pop:hotspot, .after = tract)
+
+```
+
+## Evaluating imputation via visualization
+
+Missing data have been imputed using the next smallest geography available. In order to assess the accuracy of these imputations, we plot the variables with imputed values against another variable with no imputed values, one which should have some correlation with the partially imputed variable. We can then see if the imputed values follow the general trend of the correlation or not.
+
+STEPHANIE 12/16 - I'm torn between just choosing one visualization per imputated variable or keeping in all of these and then providing comments on each of them in the body of the Quarto doc (aka not using # in the code chunks). Either way, I think we should split up the below code chunks for each visualization we keep in and then provide a bit of commentary after each one for interpretation of the graph.
+
+I've also modeled a cleaned version of the evaluation data visualization for the code in the chunk after "# % rent burdened vs. POC ratio" which we can replicate for the visualizations we want to keep.
+
+```{r}
+#| label: "Evaluating imputation"
+
+#### PERCENT RENT BURDENED ####
+
+# It was harder finding variables that are clearly correlated with this than it 
+# was for some of the other partially-imputed variables. These are the most
+# useful results I got.
+
+# % rent burdened vs. POC ratio
+dc_full_data |> ggplot() +
+  geom_point(mapping =
+    aes(x = ed_bach_ratio, y = rent_burden_pct,
+        color = as.character(rb_imputed)),
+    alpha = 0.4
+  ) +
+  scale_color_manual(labels = c("No", "Yes"), values = c("#2271B5", "#8E133B")) +
+  labs(title = "Evaluating Rent Burden Imputation",
+       subtitle = "Comparison with population with a Bachelor's degree",
+       color = "Imputed?") +
+  xlab("Proportion of Population with a Bachelor's Degree") +
+  ylab("Proportion of Households with Rent Burden") +
+  theme_minimal()
+# Not a super strong trend here, but all imputed data points seem to fit
+# the general shape of the data.
+
+# % rent burdened vs. ward
+dc_full_data |> ggplot() +
+  geom_point(mapping =
+    aes(x = ward, y = rent_burden_pct,
+        color = as.character(rb_imputed))
+  ) +
+  labs(color = "imputed (0 = no, 1 = yes)")
+# All the outliers here (rent_burden_pct = 1 or = 0) are not imputed values.
+# Wouldn't want to rely on this alone since we impute using ward-level means
+# in a few cases, but alongside the other charts, it provides further reassurance.
+
+#### MEDIAN HOUSEHOLD INCOME ####
+
+# Median household income vs. POC ratio
+dc_full_data |> ggplot() +
+  geom_point(mapping =
+    aes(x = race_poc_ratio, y = med_hhi,
+        color = as.character(hhi_imputed))
+  ) +
+  labs(color = "imputed (0 = no, 1 = yes)")
+# This looks pretty promising to me in terms of the imputed values being reasonable
+# One or two semi-outliers, but imputed values generally follow trend of other data
+# Don't think we need to worry too much about values where x = 0;
+# these likely had no population data or actually no population
+
+# Median household income vs. bachelor's degree ratio
+dc_full_data |> ggplot() +
+  geom_point(mapping =
+    aes(x = ed_bach_ratio, y = med_hhi,
+        color = as.character(hhi_imputed))
+  ) +
+  labs(color = "imputed (0 = no, 1 = yes)")
+# The outlier here is really just an outlier on in terms of ed_bach_ratio.
+# Arguably the imputed med_hhi should have been higher, but not sure how much
+# of an issue this is considering it's only one data point.
+
+# Median household income vs. ward
+dc_full_data |> ggplot() +
+  geom_point(mapping =
+    aes(x = ward, y = med_hhi,
+        color = as.character(hhi_imputed))
+  )
+# This looks good to me too. Really no imputed values are outliers in their ward.
+
+
+#### MEDIAN PROPERTY VALUE ####
+
+# Median property value vs. POC ratio
+dc_full_data |> ggplot() +
+  geom_point(mapping =
+    aes(x = race_poc_ratio, y = med_prop_val,
+        color = as.character(propval_imputed))
+  ) +
+  labs(color = "imputed (0 = no, 1 = yes)")
+# Imputed values seem to fit trend of data quite well.
+
+# Median property value vs. bachelor's degree ratio
+dc_full_data |> ggplot() +
+  geom_point(mapping =
+    aes(x = ed_bach_ratio, y = med_prop_val,
+        color = as.character(propval_imputed))
+  ) +
+  labs(color = "imputed (0 = no, 1 = yes)")
+# Slightly weirdly shaped data, but the imputed points do not seem to be
+# outside the trend. Only outlier is on the ed_bach_ratio var.
+
+# Median property value vs. ward
+dc_full_data |> ggplot() +
+  geom_point(mapping =
+    aes(x = ward, y = med_prop_val,
+        color = as.character(propval_imputed))
+  ) +
+  labs(color = "imputed (0 = no, 1 = yes)")
+# No imputed values are outliers in their ward.
+
+# Remove indicator variables for imputation
+dc_full_data <- dc_full_data |>
+  select(-rb_imputed,
+         -hhi_imputed,
+         -propval_imputed)
+
+```
+
+
+## Prepare the data for analysis (set seed & splitting)
+
+JAMIE 12/12 - Changed the var names so that these are the splits we use for all models, not just decision tree
+
+* Do we need an implementation set too?
+
+STEPHANIE 12/13 - Aaron mentioned that we should make sure that when we split the data, that we should stratify the data by some geographic feature so that for example not all the block groups in a certain ward are only in the training data. Because then our model would only really work for that ward. Thus, the argument strata = ward.
+* Concerning implementation data, I worry that since we only have a set of n = 571 that taking out a number would significantly affect our model. Maybe we can just do a set of 10 data points for the implementation data like we did in Assignment 7, but we'd have to randomize which ten are taken out (which we didn't do in assignment 7, we sliced the data by where observations were located in the dataset)
+
+
+```{r}
+#| label: "Split into training and testing"
+
+# Set seed
+set.seed(20241202)
+
+# Split sample and create training and testing datasets
+dc_split <- initial_split(data = dc_full_data, strata = ward, prop = 0.8)
+dc_train <- training(x = dc_split) 
+dc_test <- testing(x = dc_split)
+
+```
+
+# Exploratory Data Analysis
+
+## Review summary statistics
+
+JAMIE 12/12 - Added summary stats table here
+
+```{r}
+#| label: "Create summary stats table"
+
+# Review summary statistics
+kable(dc_train_summary <- as_tibble(dc_train |>
+                                      select(where(is.numeric)) |>
+                                      lapply(summary) |>
+                                      lapply(`length<-`, 6)) |>
+        mutate(measure = c("Min", "Q1", "Median", "Mean", "Q3", "Max")) |>
+        mutate(across(everything(), as.vector)) |>
+        pivot_longer(-measure) |>
+        pivot_wider(id_cols = "name",
+                    names_from = "measure",
+                    values_from = "value"))
+
+```
+
+## Exploration of some of the continuous variables
+
+JAMIE 12/12 - when we run the below viz we have a warning message that 56 rows were removed.
+
+* I silenced the total ed attainment ggplot per by above note.
+
+STEPHANIE 12/13 - concerning the rows being removed, I think that's fine. I think that's happened with me for other visualizations before.
+* Concerning the ed attainment, I'm getting a thing that "educ_total" doesn't exist...so I'm not sure what's happening here
+JAMIE 12/13 - I removed the var that went into educ_total bc it's just the total line in the education table. So basically if we want to use a data viz here we need to use the categorical vars.
+
+
+```{r}
+#| label: "Exploring household income"
+
+# Median household income, continuous
+dc_train |>
+  ggplot() +
+  geom_histogram(aes(x = as.numeric(med_hhi))
+  )
+
+# Total educational attainment
+#dc_train |>
+#  ggplot() +
+#  geom_histogram(aes(x = as.numeric(educ_total))
+#  )
+# Still not sure how to interpret this one. Might be worth going back to the categories
+
+```
+
+## Exploring temperature in relation to other variables
+
+JAME 12/12 - I fixed this - I guess we have to left_join with the sf df in the first position in left_join(), so that we join the non-sf df onto the sf df and it stays sf. BUT do we have to st_transform() since the crs is not 4326?
+
+STEPHANIE 12/13 - It doesn't matter that the CRS isn't 4326 for mapping purposes - the main concern with CRS is that it has to be the same between two spatial datasets if you're going to do something like join the two. 
+I'm also realizing that we probably shouldn't do a map here with dc_train because this map shows which block groups are in the training data (vs. the testing data) since you can see which block groups are excluded from the map...so this may be a form of data leakage. I'm going to instead use the dc_full_data dataset.
+
+```{r}
+#| label: "Mapping temperature"
+
+dc_full_data |> ggplot() +
+  geom_sf(
+    mapping = aes(fill = uhi),
+    color = "#400001"
+    ) +
+    scale_fill_gradient(
+    low = "#ffffff",
+    high = "#be2b25"
+    ) +
+  labs(
+    title = "Average evening temperature, 2018",
+    fill = "Temperature (degrees F)"
+  ) +
+  theme_void()
+
+```
+
+Temperature & population:
+
+```{r}
+#| label: "Plotting temperature X population, pop density, non-white density"
+
+# Total population
+dc_train |>
+  ggplot(aes(x = total_pop, y = uhi, color = hotspot)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal()
+
+# Population density
+dc_train |>
+  ggplot(aes(x = pop_dens_sq_mi, y = uhi, color = hotspot)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal()
+
+# Non-white population density
+dc_train |>
+  ggplot(aes(x = race_poc_ratio, y = uhi, color = hotspot)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal()
+
+```
+
+Temperature & income/education:
+
+```{r}
+#| label: "Mapping temp X HHI, education"
+
+# Median household income
+dc_train |>
+  ggplot(aes(x = med_hhi, y = uhi, color = hotspot)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal()
+
+# Ratio of bachelors degrees
+dc_train |>
+  ggplot(aes(x = ed_bach_ratio, y = uhi, color = hotspot)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal()
+
+```
+
+Temperature & landcover:
+
+```{r}
+#| label: "Mapping landcover variables"
+
+# Comparing with percentage of non-canopy vegetation
+dc_train |>
+  ggplot(aes(x = veg_pct, y = uhi, color = hotspot)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal()
+
+# Comparing with percentage area of urban tree canopy
+dc_train |>
+  ggplot(aes(x = utc_pct, y = uhi, color = hotspot)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal()
+
+# Comparing with percentage area of impervious surfaces (e.g., roads, parking
+# lots, etc.)
+dc_train |>
+  ggplot(aes(x = to_ia_pct, y = uhi, color = hotspot)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal()
+
+```
+
+STEPHANIE 12/13 - The graphs that compare UHI with percentage area of urban tree canopy and of impervious surfaces seems quite compelling. This makes sense, and it's interesting to notice how not a lot of the demographic stuff doesn't seem to show up in EDA but the landcover stuff seem like promising predictors.
+
+# Preparation for Modeling
+STEPHANIE 12/13 - I added "-tract" and "-ward" to remove more geographic indicators that likely would affect the model, since that otherwise would've been a main predictor of a hotspot
+
+JAMIE 12/12 - Do we want folds? added here. Not using folds does not make the lm rank deficient model warning go away.
+STEPHANIE 12/13 - I think yes, we'll have to use it, especially for hyper parameter tuning. My main issue with folding at this point is that I think we need to remove all the variables we don't want from dc_train first and then get do folding so that the folding process doesn't take them into account. So I think we should take out the variables from dc_train before the lm and rf models (using select rather than step_rm) and then do the folding.
+JAMIE 12/13 - Relocated these steps per discussion.
+
+MADELEINE 12/14 - should hotspot be kept in here? there is a comment saying "remove duplicative hotspot", but then the next code chunk seems to need it
+
+STEPHANIE 12/15 - that's a good point, Madeleine; we'll have to remove it for lm and rf but need to keep it in for decision tree
+
+```{r}
+#| label: "Prep data for modeling, set up v-fold cross-validation"
+
+# Prep the dataset for modeling
+dc_train <- dc_train |>
+  st_drop_geometry() |>
+  select(
+    # remove identifying vars
+    -block_group,
+    -intptlat,
+    -intptlon,
+    -gis_id,
+    -globalid, gid,
+    -tract,
+    -ward,
+    -block_group_temp,
+    # remove raw total pop var (custom pop density and other pop proportion
+    # vars remain)
+    -total_pop,
+    # remove raw race vars (custom proportion vars remain)
+    -race_white,
+    -race_black,
+    -race_ai_an,
+    -race_asian,
+    -race_nh_pi,
+    -race_oth_mult,
+    -race_eth_hisp,
+    # remove raw ed vars (custom proportion vars remain)
+    -ed_doct,
+    -ed_prof_deg,
+    -ed_master,
+    -ed_bach,
+    -ed_assoc,
+    -ed_reg_hsd,
+    -ed_ged,
+    -ed_comb_hsd,
+    -ed_comb_adv_deg,
+    # remove duplicative housing data (custom proportion vars and pct var
+    # remain)
+    -total_hous_units,
+    -occ_units,
+    -vac_units,
+    # remove duplicative land data (custom proportion / "pct" vars remain)
+    -ends_with("_ac"),
+    -total_sq_mi,
+    -water_sq_mi,
+    -wtr_pct,
+    -aland,
+    -awater,
+    -utcac0620,
+    -utcac1120,
+    -utcac1520,
+    -utcpct0620,
+    -utcpct1120,
+    -utc_pct_06,
+    -utc_pct_11,
+    -utc_pct_15,
+    # remove pop_density_water_sq_mi due to INF value for most records 
+    -pop_density_water_sq_mi) 
+
+# V-fold cross validation with 10 folds
+dc_folds <- vfold_cv(data = dc_train, v = 10)
+
+```
+
+# Decision Tree
+
+## Modeling
+
+```{r}
+#| label: "Create decision tree model"
+
+dt_recipe <- recipe(formula = hotspot ~ ., data = dc_train) |>
+  # Remove uhi var to avoid duplication of data from hotspot
+  step_rm(uhi) |>
+  themis::step_downsample(hotspot) |> 
+  step_nzv(all_numeric_predictors())
+
+dt_model <- decision_tree() |>
+  set_engine(engine = "rpart") |>
+  set_mode(mode = "classification")
+
+dt_workflow <- workflow() |>
+  add_recipe(dt_recipe) |>
+  add_model(dt_model)
+  
+dt_fitting <- dt_workflow |>
+  fit(data = dc_train)
+
+rpart.plot::rpart.plot(x = dt_fitting$fit$fit$fit,
+                       roundint = FALSE)
+
+```
+STEPHANIE 12/15 - Retaining comments for write-up in case we want to utilize them:
+
+Notes on results:
+I think we have an interesting model. The first decision point is whether the percentage of the block group that's covered by tree canopy; if it's greater or equal to 23% then it's not a hotspot. If it is less than 23%, then you check how suitable the block group is for tree planting "based on a weighted formula that includes all planting prioritization categories." If the score is less than 7, then it's a not hotspot. If it's greater than or equal to seven, you check the percent of total area that's covered by all combined impervious surfaces. If the percentage is less than 66%, then it's not a hotspot. If it's greater than or equal to 66%, then the final check is whether the number of housing units per person is less than 0.74. If it's greater than or equal to 0.75, then it's not a hotspot. If it is less than 0.74 then it is a hotspot. This last one is a bit odd because it's against what you think would happen...why would more housing units per person lead to cooler conditions? We could throw out some hypotheses here like since there are more housing units per person that means it's less densely occupied, so less heat?
+
+Note on methods:
+STEPHANIE 12/13 - I've decided to keep in downsampling because I think it's useful. For reference, down-sampling "randomly subset all the classes in the training set so that their class frequencies match the least prevalent class. For example, suppose that 80% of the training set samples are the first class and the remaining 20% are in the second class. Down-sampling would randomly sample the first class to be the same size as the second class (so that only 40% of the total training set is used to fit the model)."
+
+## Visualizing Important Variables
+
+STEPHANIE 12/13 - Using dc_full_data as the dataset since it's possible we may accidentally do data leakage when mapping dc_train because we'll notice which block groups were excluded.
+
+STEPHANIE 12/16 - I'm realizing I made a mistake, I visualized not the most important variables but the ones represented in the decision tree (which are actually different from the most important variables...I've put that code in mute below). I think both are valid but curious if we should plot the top most important variables instead of the variables in the decision tree nodes?
+
+```{r fig.width = 9, fig.height = 8}
+#| label: "Mapping important variables"
+
+#dt_fitting |>
+ # extract_fit_parsnip() |>
+  # vip(num_features = 10)
+
+canopy_map <- dc_full_data |> ggplot() +
+  geom_sf(aes(fill = utc_pct)) +
+    scale_fill_gradient(
+    low = "#fcbc32",
+    high = "#4e974b"
+    ) +
+  theme_void() +
+  labs(
+    title = "Percentage of tree canopy",
+    subtitle = "by Block Group",
+    fill = "Percent Area",
+    caption = "Open Data DC (2020)"
+  )
+
+planting_map <- dc_full_data |> ggplot() +
+  geom_sf(aes(fill = overall)) +
+    scale_fill_gradient(
+    low = "#e2e2e2",
+    high = "#16501a"
+    ) +
+  theme_void() +
+  labs(
+    title = "Tree planting suitability score",
+    subtitle = "by Block Group",
+    fill = "Score",
+    caption = "Open Data DC (2020)"
+  )
+
+impervious_map <- dc_full_data |> ggplot() +
+  geom_sf(aes(fill = to_ia_pct)) +
+    scale_fill_gradient(
+    low = "#ffffff",
+    high = "#28292b"
+    ) +
+  theme_void() +
+  labs(
+    title = "Percentage covered by impervious surfaces",
+    subtitle = "by Block Group",
+    fill = "Percent Area",
+    caption = "Open Data DC (2020)"
+  )
+
+housing_map <- dc_full_data |> ggplot() +
+  geom_sf(aes(fill = hous_units_per_person)) +
+    scale_fill_gradient(
+    low = "#d86400",
+    high = "#0085d4"
+    ) +
+  theme_void() +
+  labs(
+    title = "Housing units per person",
+    subtitle = "by Block Group",
+    fill = "# Housing Units",
+    caption = "ACS 2016-2020"
+  )
+
+canopy_map + planting_map + impervious_map + housing_map
+
+```
+
+## Evaluating the Model
+
+STEPHANIE 12/15 - Adding this evaluation in since we need to assess the decision tree model on its own (can't really compare it to rf and lm since they have different outcome variables).
+
+### Creating predictions
+
+```{r}
+#| label: "Creating predictions"
+
+# Ensuring the testing dataset has the same variables as the training dataset
+dc_test <- dc_test |>
+  st_drop_geometry() |>
+  select(
+    # remove identifying vars
+    -block_group,
+    -intptlat,
+    -intptlon,
+    -gis_id,
+    -globalid, gid,
+    -tract,
+    -ward,
+    -block_group_temp,
+    # remove raw total pop var (custom pop density and other pop proportion
+    # vars remain)
+    -total_pop,
+    # remove raw race vars (custom proportion vars remain)
+    -race_white,
+    -race_black,
+    -race_ai_an,
+    -race_asian,
+    -race_nh_pi,
+    -race_oth_mult,
+    -race_eth_hisp,
+    # remove raw ed vars (custom proportion vars remain)
+    -ed_doct,
+    -ed_prof_deg,
+    -ed_master,
+    -ed_bach,
+    -ed_assoc,
+    -ed_reg_hsd,
+    -ed_ged,
+    -ed_comb_hsd,
+    -ed_comb_adv_deg,
+    # remove duplicative housing data (custom proportion vars and pct var
+    # remain)
+    -total_hous_units,
+    -occ_units,
+    -vac_units,
+    # remove duplicative land data (custom proportion / "pct" vars remain)
+    -ends_with("_ac"),
+    -total_sq_mi,
+    -water_sq_mi,
+    -wtr_pct,
+    -aland,
+    -awater,
+    -utcac0620,
+    -utcac1120,
+    -utcac1520,
+    -utcpct0620,
+    -utcpct1120,
+    -utc_pct_06,
+    -utc_pct_11,
+    -utc_pct_15,
+    # remove pop_density_water_sq_mi due to INF value for most records 
+    -pop_density_water_sq_mi) 
+
+# Creating predictions dataset
+dt_predictions <- bind_cols(
+  dc_test,
+  predict(object = dt_fitting, new_data = dc_test),
+  predict(object = dt_fitting, new_data = dc_test, type = "prob")
+) 
+
+# Editing column names so it's readable
+names(dt_predictions) <- names(dt_predictions) |>
+  str_replace(" ", "_")
+
+# Printing a few predictions
+dt_predictions |>
+  select(hotspot, .pred_class, .pred_hotspot, .pred_not_hotspot) |>
+  print(n = 20)
+
+```
+
+### Creating confusion matrix
+```{r}
+#| label: "Confusion matrix"
+
+# Transforming the hotspot variable to become a factor variable
+dt_predictions$hotspot <- as.factor(dt_predictions$hotspot)
+
+# Creating confusion matrix
+conf_mat(data = dt_predictions,
+         truth = hotspot,
+         estimate = .pred_class)
+
+```
+
+Calculating accuracy, precision, and recall/sensitivity:
+```{r}
+#| label: "Calculating accuracy, precision, recall"
+#| eval: false
+
+accuracy(data = dt_predictions,
+          truth = hotspot,
+          estimate = .pred_class)
+
+precision(data = dt_predictions,
+          truth = hotspot,
+          estimate = .pred_class)
+
+recall(data = dt_predictions,
+     truth = hotspot,
+     estimate = .pred_class)
+
+```
+Accuracy and recall are relatively high at 87.9% and 94.1%, respectively. This means that the model works relatively well in correctly classifying whether or not a block group is a hotspot and in specifically correctly identifying hotspots when that block group actually is a hotspost. Precision is not as high at 55.2%, since there were 13 instances in which the model predicted a block group is a hotspot when in reality it was not one. One possible way to improve the model is to adjust the threshold used to determine whether a block group is a hotspot or not. Another idea may be to examine the predictors used and adjust which ones should be included or not. For example, we made an assumption that using percentage area of the landcover variables rather than the total area variables (e.g., we chose percentage of area covered by canopy rather than total area covered by canopy) to allow consistency across block groups who vary in total area size. Perhaps it would be worth investigating the performance of this model using the total area variables instead or even alongside the percentage variables.
+
+# Linear Regression
+
+```{r}
+#| label: "Recipe for LM and RF models"
+
+# Create recipe for use in linear regression and random forest models
+# Create the recipe
+dc_recipe <- recipe(formula = uhi ~ ., data = dc_train) |>
+  # remove duplicative hotspot 
+  step_rm(hotspot) |>
+  # Removing predictors that have near zero variability
+  step_nzv(all_predictors()) |>
+  # Removing predictors that are highly correlated with others
+  step_corr(all_predictors())
+
+```
+
+## Modelling
+
+```{r}
+#| label: "Creating LM model"
+
+# Linear regression model
+dc_lm_model <- 
+  linear_reg() |>
+  set_mode(mode = "regression") |>
+  set_engine(engine = "lm")
+
+# Linear regression workflow
+dc_lm_workflow <- 
+  workflow() |>
+  add_recipe(recipe = dc_recipe) |>
+  add_model(spec = dc_lm_model)
+  
+unloadNamespace("Metrics")
+
+# Setting up resamples for later evaluation
+dc_lm_resamples <- dc_lm_workflow |>
+  fit_resamples(resamples = dc_folds)
+
+```
+
+STEPHANIE 12/15 - I took out fitting the model because we only really have to fit the best model between linear regression and random forests, since the purpose of fitting the model is to then create predictions from it, and we'd only want to create predictions based on the best model.
+Also, I'm not sure what we mean by line 1165 (unloadNamespace("Metrics")).
+
+# Random Forests
+
+## Modelling 
+
+### Hyperparameter Tuning
+
+```{r}
+#| label: "Hyperparameter tuning"
+
+dc_rf_model <- 
+  rand_forest(
+  trees = 200,
+  mtry = tune(),
+  min_n = tune()) |>
+  set_mode(mode = "regression") |>
+  set_engine(
+    engine = "ranger", 
+    importance = "impurity",
+    num.threads = 4
+  )
+
+# Create a parameter grid
+dc_rf_grid <- grid_regular(mtry(range = c(1, 15)),
+                           min_n(range = c(1, 15)),
+                           levels = 5)
+
+# Random forest workflow
+dc_rf_workflow <- 
+  workflow() |>
+  add_recipe(dc_recipe) |>
+  add_model(dc_rf_model)
+
+# Creating a grid to show results of hyper parameter tuning
+dc_rf_grid <- grid_regular(
+  mtry(range = c(1, 15)),
+  min_n(range = c(1, 15)),
+  levels = 5
+)
+
+# Tuning the grid
+rf_resamples <- tune_grid(
+  dc_rf_workflow,
+  resamples = dc_folds,
+  grid = dc_rf_grid
+)
+
+# Showing the best hyperparameters based on model performance
+show_best(rf_resamples)
+
+```
+Based on hyperparameter tuning, the best random forest model uses mtry = 15 and min_n = 11.
+
+STEPHANIE 12/15 - I took out the kable() argument from the line of code when we make dc_rf_grid becuase we don't really need to see the grid at that point; what matters is the last line of code when you show which hyperparameters are the best ones to use.
+It looks like mtry = 15 and min_n = 11 are the best options.
+
+### Implementing best hyperparameters based on tuning
+
+```{r}
+#| label: "Implementing best hyperparameters"
+
+# Filling in hyperparameters based on tuning
+dc_rf_model <- rand_forest(
+  trees = 200,
+  mtry = 15,
+  min_n = 11
+) |>
+  set_mode(mode = "regression") |>
+  set_engine(
+    engine = "ranger", 
+    importance = "impurity",
+    num.threads = 4
+  )
+
+# Random forest workflow
+dc_rf_workflow <- 
+  workflow() |>
+  add_recipe(dc_recipe) |>
+  add_model(dc_rf_model)
+
+rf_resamples <- dc_rf_workflow |>
+  fit_resamples(resamples = dc_folds)
+
+```
+
+# Comparing Models
+## Plot the RMSEs across each fit:
+
+JAMIE 12/12 - Below is what I used in the assignment 07 hw to pull the metrics in the end, so pasted here and updated a bit. It renders!
+
+STEPHANIE 12/15 - I edited the code to be a bit more simple (also based on what I submitted for assignment 07)
+
+```{r}
+#| label: "RMSE for each resample of each model"
+
+# Linear Regression: Calculating and plotting the RMSE for each resample
+collect_metrics(
+  dc_lm_resamples, 
+  summarize = FALSE) |>
+  filter(.metric == "rmse") |>
+  print() |>
+  ggplot(mapping = aes(x = id, y = .estimate, group = .metric)) +
+  geom_point() +
+  geom_line()
+
+# Random Forests: Calculating and plotting the RMSE for each resample
+rf_resamples |>
+  collect_metrics(summarize = FALSE) |>
+  filter(.metric == "rmse") |>
+  print() |>
+  ggplot(mapping = aes(x = id, y = .estimate, group = .metric)) +
+  geom_point() +
+  geom_line()
+
+# Comparing average rmse
+bind_rows(
+  "Linear regression" = collect_metrics(dc_lm_resamples) |>
+    filter(.metric == "rmse"), 
+  'Random forest' = collect_metrics(rf_resamples) |>
+    filter(.metric == "rmse"),
+  .id = "model"
+)
+
+```
+
+STEPHANIE 12/15 - Based on this, it seems that linear regression is the better model over random forests by a fairly large margin, which I find interesting since I think usually random forest models out perform other models like lm and regression trees?
+
+# Implement the Final Model
+
+STEPHANIE 12/13 - Setting up the final code block for when we decide which model we should make predictions from. This probably won't render because the random forest model isn't working at the time I'm writing this (7pm) 
+MADELEINE 12/15 - not sure if more needs to be done here, but when I just replace the argument of extract_workflow with dc_lm_model, I get two errors. 1) select(-hotspot): hotspot does not exist. 2) no applicable method for 'extract_workflow' applied to an object of class "c('linear_reg', 'model_spec')"
+Setting to not evaluate for now
+STEPHANIE 12/16 - I've edited this code so that it should work now.
+
+```{r}
+#| label: "Implement final model"
+#| eval: false
+
+# Removing hotspot variable to be consistent with the recipe 
+dc_test <- dc_test |>
+  select(-hotspot)
+
+# Selecting the best resamples via select_best
+lm_best <- dc_lm_resamples |>
+  select_best(metric = "rmse")
+
+# Finalizing the workflow with finalize_workflow
+lm_final <- finalize_workflow(
+  dc_lm_workflow,
+  parameters = lm_best
+)
+
+# Fitting the model on all the data
+lm_final_fit <- 
+  lm_final |>
+  last_fit(dc_split) 
+
+# Collecting metrics for RMSE
+lm_final_fit |>
+  collect_metrics() |>
+  filter(.metric == "rmse")
+
+# making predictions with the testing data
+lm_predictions <- bind_cols(
+  dc_test,
+  predict(object = extract_workflow(lm_final_fit), 
+          new_data = dc_test) 
+)
+
+# Displaying the first 10 predictions against the actual values
+select(lm_predictions, uhi, starts_with(".pred"))
+
+# Interrogating which values were incorrectly predicted to the nearest tenth
+lm_predictions |>
+  select(uhi, .pred) |>
+  mutate(.pred = round(lm_predictions$.pred, 1),
+         uhi = round(lm_predictions$uhi, 1),
+         correct = if_else(.pred == uhi, "Yes", "No"
+         )) |>
+  count(correct)
+
+```
+STEPHANIE 12/16 - I'm a bit concerned how the regression model correctly predicts ALL uhi values when rounded to the nearest tenth...is this possible?! When you round to the nearest hundreth, it still gets 109 of 116 correct. But then by the thousandth it goes to only 73 correct.
+
+## Visualizing the most important predictors
+```{r}
+#| label: "Visualize most important predictors"
+#| eval: false
+
+lm_final_fit |>
+  extract_fit_parsnip() |>
+  vip(num_features = 20) 
+
+%>%
+  .$data |>
+  mutate(
+    Importance = Importance / max(Importance),
+    Variable = fct_reorder(.x = Importance, .f = Variable)
+  ) |>
+  ggplot(aes(Importance, Variable)) +
+  geom_col()
+
+```
+STEPHANIE 12/16 - Wow, it's kinda wild how it's really only seven variables of our 54 predictors that have large importance. I'm assuming that the other ones listed here are still somewhat important but maybe not enough for the bar to be visualized?
+
+
+STEPHANIE 12/13 - Then with the code chunk below, we should make some maps with the top ~3 variables as determined by the code chunk above
+```{r}
+
+
+
+```
+
+## Estimate the out-of-sample error rate
+
+JAMIE 12/13 - Added metrics work below
+STEPHANIE 12/15 - Sorry for my ignorance, but I'm not entirely sure what we're doing here - is it finding another metric to compare models? Based on the RMSE values above, it seems we should go with the regression model and then create predictions with that and then visualize the best predictors.
+MADELEINE 12/15 - also, this chunk does not run because dc_lm_fit is not defined. Setting it to not evaluate for now
+STEPHANIE 12/16 - I've moved this below the creating predictions chunk. I think Jamie was on the right track in that we should calculate an error rate for the linear regression model, but I think this has to come after how we made predictions.
+
+```{r}
+#| eval: false
+
+# save best lm fit
+best_lm_fit <- fit_best(dc_lm_fit, verbose = TRUE)
+
+# make predictions using best fit
+test_predictions <-
+  dc_test |>
+  select(uhi) |>
+  rename(y = uhi) |>
+  mutate(y = as.numeric(y)) |>
+  mutate(y_hat = as.numeric(as_vector(predict(best_lm_fit, dc_test))))
+
+# collect rf metrics
+kable(rmse(actual = test_predictions$y, predicted = test_predictions$y_hat))
+
+```
+
+# Practical Use of the Model
+
+STEPHANIE 12/16 - We should write about how DC should use this model. I assume something along the lines of being able to predict which block groups are at most risk of becoming a hotspot based on its characteristics and as they change year over year. We just need to be careful to not fall into a correlation/causation mindset and say something like "these block groups should plant more trees!" since that's incorrect - modelling here isn't like the regression we've done in Quant classes.
+
+# Sources
+
+https://www.climatecentral.org/climate-matters/urban-heat-islands-2024
+
+https://opendata.dc.gov/datasets/DCGIS::urban-tree-canopy-by-census-block-group-in-2020/about
+
+Census ACS 5yr 2016 - 2020
+
+https://www2.census.gov/programs-surveys/acs/tech_docs/accuracy/MultiyearACSAccuracyofData2020.pdf
+
+http://bit.ly/3DnlfIh
+
+https://climatecope.research.pdx.edu/ 
+
+
