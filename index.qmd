@@ -10,7 +10,6 @@ embed-resources: true
 editor_options: 
   chunk_output_type: console
 execute: 
-  warning: false
 urlcolor: blue
 toc: true
 editor: 
@@ -102,8 +101,9 @@ landcover |>
   theme_void() +
   labs(title = "District of Columbia Census Block Groups, by Ward",
        subtitle = "2020",
-       caption = paste0("Source: Census American Community Survey, 2016 - 2022",
-                        "\nUrban Tree Canopy by Census Block Group, 2020"),
+       caption = paste0("Source: Census American Community Survey, 2016 - 2020",
+                        "\nDC Open Data Urban Tree Canopy by Census Block",
+                        " Group, 2020"),
        fill = "Ward") 
 
 ```
@@ -122,7 +122,7 @@ acs_variables <- load_variables(2020, "acs5") |>
 
 ```
 
-### Load select Census ACS 5-yr 2016 - 2020 variables via API
+Load select Census ACS 5-yr 2016 - 2020 variables via API
 
 ```{r}
 #| label: "Load ACS data"
@@ -354,7 +354,7 @@ acs_data <- acs_data |>
 
 ## Determine Threshold for Hotspot vs. Not Hotspot
 
-Decide the threshold for hot vs. not hot:
+Decide the threshold for a hotspot:
 
 ```{r}
 
@@ -362,7 +362,15 @@ Decide the threshold for hot vs. not hot:
 landcover |>
   group_by(uhi) |>
   ggplot(aes(uhi)) +
-  geom_histogram(aes(y = cumsum(..count..)))
+  geom_histogram(aes(y = cumsum(..count..))) +
+  labs(title = paste0("Distribution of Urban Heat Index (UHI) Variable",
+                      "\nDistrict of Columbia"),
+       subtitle = "2020",
+       caption = paste0("Source: DC Open Data Urban Tree Canopy by Census",
+                        "\nBlock Group, 2020, and Portland State University")) +
+  xlab("Urban Heat Index (UHI)") +
+  ylab("Frequency")
+  
 
 # Calculate / visualize frequency & cumulative frequency
 heat_freq <- landcover |>
@@ -383,15 +391,7 @@ heat_freq |>
 
 ```
 
-The threshold for "hotspot" is having a uhi (average evening temperature) of 91.6 degrees Fahrenheit, which is one standard deviation (1.8 degrees) above the mean.
-This means that 82 of the 571 block groups (\~14%) would be classified as a hotspot.
-We decided on this threshold with the belief that a hotspot should represent a blockgroup that meaningfully has an average higher temperature that the majority of the sample.
-Using standard deviation as a benchmark seemed to be an appropriate way to naturally divide the data.
-
-STEPHANIE 12/16 - I for the life of me cannot find more information about the methodology of when the Portland State University SUPR Lab collected the temperature data for DC.
-According to this source (https://data.cityoftacoma.org/datasets/tacoma::urban-heat-island-uhi-index-2018-portland-state-university/about), they collected the Portland data on 7/25/18, so I must assume that DC was around the same time, but I can't find something online that confirms this.
-
-MADELEINE 12/14: I split up the join from the metrics because the ward-level imputation has to happen in between (after join, before metrics).
+The threshold for "hotspot" is having a uhi (average evening temperature) of 91.6 degrees Fahrenheit, which is one standard deviation (1.8 degrees) above the mean. This means that 82 of the 571 block groups (\~14%) would be classified as a hotspot. We decided on this threshold with the belief that a hotspot should represent a block group that meaningfully has an average higher temperature than the majority of the sample. Using standard deviation as a benchmark seemed to be an appropriate way to naturally divide the data.
 
 ```{r}
 #| label: "Stitch the datasets together"
@@ -438,7 +438,7 @@ dc_full_data <- dc_full_data |>
 
 ```
 
-## Finalize the Full Dataset
+# Finalize the Full Dataset
 
 ```{r}
 #| label: "Create metrics"
@@ -674,67 +674,30 @@ dc_test <- testing(x = dc_split)
 
 # Conduct Exploratory Data Analysis
 
-## Review Summary Statistics
+## Review Distribution of Median Household Income
 
 ```{r}
-#| label: "Create summary stats table"
-
-# Review summary statistics
-kable(dc_train_summary <- as_tibble(dc_train |>
-                                      select(where(is.numeric)) |>
-                                      lapply(summary) |>
-                                      lapply(`length<-`, 6)) |>
-        mutate(measure = c("Min", "Q1", "Median", "Mean", "Q3", "Max")) |>
-        mutate(across(everything(), as.vector)) |>
-        pivot_longer(-measure) |>
-        pivot_wider(id_cols = "name",
-                    names_from = "measure",
-                    values_from = "value"))
-
-```
-
-STEPHANIE 12/16 - Is there something meaningful we can say about the summary statistics?
-Otherwise unsure about
-
-## Exploration of some of the continuous variables
-
-JAMIE 12/12 - when we run the below viz we have a warning message that 56 rows were removed.
-
--   I silenced the total ed attainment ggplot per by above note.
-
-STEPHANIE 12/13 - concerning the rows being removed, I think that's fine.
-I think that's happened with me for other visualizations before.
-* Concerning the ed attainment, I'm getting a thing that "educ_total" doesn't exist...so I'm not sure what's happening here 
-JAMIE 12/13 - I removed the var that went into educ_total bc it's just the total line in the education table.
-So basically if we want to use a data viz here we need to use the categorical vars.
-STEPHANIE 12/16 - I see, I think maybe we should just remove that one then?
-
-```{r}
-#| label: "Exploring household income"
+#| label: "Explore household income"
 
 # Median household income, continuous
 dc_train |>
   ggplot() +
   geom_histogram(aes(x = as.numeric(med_hhi))
-  )
-
-# Total educational attainment
-#dc_train |>
-#  ggplot() +
-#  geom_histogram(aes(x = as.numeric(educ_total))
-#  )
-# Still not sure how to interpret this one. Might be worth going back to the categories
+  ) +
+  theme_minimal() +
+  labs(title = paste0("Median Household Income Distribution in the District of",
+                      " Columbia"),
+       subtitle = "2020",
+       caption = "Source: Census American Community Survey, 2016 - 2020") +
+  xlab("Median Household Income") +
+  ylab("Frequency") +
+  scale_x_continuous(labels = scales::label_dollar())
 
 ```
 
+A check of the distribution of the median household income variable does not reveal any red flags about the validity of the data.
+
 ## Explore Temperature in Relation to Other Variables
-
-JAME 12/12 - I fixed this - I guess we have to left_join with the sf df in the first position in left_join(), so that we join the non-sf df onto the sf df and it stays sf.
-BUT do we have to st_transform() since the crs is not 4326?
-
-STEPHANIE 12/13 - It doesn't matter that the CRS isn't 4326 for mapping purposes - the main concern with CRS is that it has to be the same between two spatial datasets if you're going to do something like join the two.
-I'm also realizing that we probably shouldn't do a map here with dc_train because this map shows which block groups are in the training data (vs. the testing data) since you can see which block groups are excluded from the map...so this may be a form of data leakage.
-I'm going to instead use the dc_full_data dataset.
 
 ```{r}
 #| label: "Mapping temperature"
@@ -749,10 +712,10 @@ dc_full_data |> ggplot() +
     high = "#940000"
     ) +
   labs(
-    title = "Average evening temperature (2018)",
+    title = "Average Evening Temperature (2018)",
     fill = "Fahrenheit",
-    caption = "Accessed via Open Data DC (2020) and created by Portland State University"
-  ) +
+    caption = paste0("Source: DC Open Data Urban Tree Canopy by Census",
+                        "\nBlock Group, 2020, and Portland State University")) +
   theme_void()
 
 ```
@@ -767,9 +730,11 @@ total_pop_eda <- dc_train |>
   ggplot(aes(x = total_pop, y = uhi, color = hotspot)) +
   geom_point(alpha = 0.5) +
   theme_minimal() +
-  labs(title = "UHI and total population",
-       subtitle = "by Block Group",
-       caption = "Sources: ACS 2016-2020, DC Open Data",
+  labs(title = "UHI and Total Population",
+       subtitle = "By Block Group",
+       caption = paste0("Source: Census American Community Survey, 2016 - 2020",
+                        "\nDC Open Data Urban Tree Canopy by Census Block",
+                        " Group, 2020, and Portland State University"),
        color = "Hotspot") +
   xlab("Total Population") +
   ylab("UHI")
@@ -781,7 +746,9 @@ pop_density_eda <- dc_train |>
   theme_minimal() +
   labs(title = "UHI and population density",
        subtitle = "by Block Group",
-       caption = "Sources: ACS 2016-2020, DC Open Data",
+       caption = paste0("Source: Census American Community Survey, 2016 - 2020",
+                        "\nDC Open Data Urban Tree Canopy by Census Block",
+                        " Group, 2020, and Portland State University"),
        color = "Hotspot") +
   xlab("Population per Square Mile") +
   ylab("UHI")
@@ -794,7 +761,9 @@ poc_pop_eda <- dc_train |>
   theme_minimal() +
     labs(title = "UHI and non-white population density",
        subtitle = "by Block Group",
-       caption = "Sources: ACS 2016-2020, DC Open Data",
+       caption = paste0("Source: Census American Community Survey, 2016 - 2020",
+                        "\nDC Open Data Urban Tree Canopy by Census Block",
+                        " Group, 2020, and Portland State University"),
        color = "Hotspot") +
   xlab("Non-white Population Proportion") +
   ylab("UHI")
@@ -815,7 +784,9 @@ mhi_eda <- dc_train |>
   theme_minimal() +
   labs(title = "UHI and median household income",
        subtitle = "by Block Group",
-       caption = "Sources: ACS 2016-2020, DC Open Data",
+       caption = paste0("Source: Census American Community Survey, 2016 - 2020",
+                        "\nDC Open Data Urban Tree Canopy by Census Block",
+                        " Group, 2020, and Portland State University"),
        color = "Hotspot") +
   xlab("Household Income") +
   ylab("UHI")
@@ -827,7 +798,9 @@ bach_eda <- dc_train |>
   theme_minimal() +
     labs(title = "UHI and college degree attainment",
        subtitle = "by Block Group",
-       caption = "Sources: ACS 2016-2020, DC Open Data",
+       caption = paste0("Source: Census American Community Survey, 2016 - 2020",
+                        "\nDC Open Data Urban Tree Canopy by Census Block",
+                        " Group, 2020, and Portland State University"),
        color = "Hotspot") +
   xlab("Proportion of population with a bachelor's degree") +
   ylab("UHI")
@@ -848,7 +821,8 @@ utc_eda <- dc_train |>
   theme_minimal() +
   labs(title = "UHI and urban tree canopy",
        subtitle = "by Block Group",
-       caption = "Source: DC Open Data",
+       caption = paste0("Source: DC Open Data Urban Tree Canopy by Census Block",
+                        " Group, 2020, and Portland State University"),
        color = "Hotspot") +
   xlab("% land area covered by urban tree canopy") +
   ylab("UHI")
@@ -860,7 +834,8 @@ imp_eda <- dc_train |>
   theme_minimal() +
   labs(title = "UHI and impervious surfaces",
        subtitle = "by Block Group",
-       caption = "Source: DC Open Data",
+       caption = paste0("Source: DC Open Data Urban Tree Canopy by Census Block",
+                        " Group, 2020, and Portland State University"),
        color = "Hotspot") +
   xlab("% land area covered by impervious surfaces") +
   ylab("UHI")
@@ -871,11 +846,6 @@ utc_eda + imp_eda
 Meanwhile, landcover variables show a potentially strong relationship with UHI. Generally, it seems that as urban tree canopy area increases, UHI decreases. Conversely, as the percent area of impervious surfaces (e.g., roads, parking lots, etc.) increases, UHI also increases. This may indicate that landcover variables may hold more importance in our models compared to demographic ones.
 
 # Preparation for Modeling
-
-MADELEINE 12/14 - should hotspot be kept in here?
-there is a comment saying "remove duplicative hotspot", but then the next code chunk seems to need it
-
-STEPHANIE 12/15 - that's a good point, Madeleine; we'll have to remove it for lm and rf but need to keep it in for decision tree
 
 ```{r}
 #| label: "Prep data for modeling, set up v-fold cross-validation"
@@ -1012,8 +982,8 @@ canopy_map <- dc_full_data |> ggplot() +
     title = "Percentage of tree canopy",
     subtitle = "by Block Group",
     fill = "Percent Area",
-    caption = "Open Data DC (2020)"
-  )
+    caption = paste0("Source: DC Open Data Urban Tree Canopy by Census Block",
+                        " Group, 2020, and Portland State University"))
 
 planting_map <- dc_full_data |> ggplot() +
   geom_sf(aes(fill = overall)) +
@@ -1026,8 +996,8 @@ planting_map <- dc_full_data |> ggplot() +
     title = "Tree planting suitability score",
     subtitle = "by Block Group",
     fill = "Score",
-    caption = "Open Data DC (2020)"
-  )
+    caption = paste0("Source: DC Open Data Urban Tree Canopy by Census Block",
+                        " Group, 2020, and Portland State University"))
 
 impervious_map <- dc_full_data |> ggplot() +
   geom_sf(aes(fill = to_ia_pct)) +
@@ -1040,8 +1010,8 @@ impervious_map <- dc_full_data |> ggplot() +
     title = "Percentage covered by impervious surfaces",
     subtitle = "by Block Group",
     fill = "Percent Area",
-    caption = "Open Data DC (2020)"
-  )
+    caption = paste0("Source: DC Open Data Urban Tree Canopy by Census Block",
+                        " Group, 2020, and Portland State University"))
 
 housing_map <- dc_full_data |> ggplot() +
   geom_sf(aes(fill = hous_units_per_person)) +
@@ -1195,7 +1165,6 @@ Perhaps it would be worth investigating the performance of this model using the 
 #| label: "Recipe for LM and RF models"
 
 # Create recipe for use in linear regression and random forest models
-# Create the recipe
 dc_recipe <- recipe(formula = uhi ~ ., data = dc_train) |>
   # remove duplicative hotspot 
   step_rm(hotspot) |>
