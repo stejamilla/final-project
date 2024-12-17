@@ -1277,7 +1277,7 @@ kable(show_best(rf_resamples))
 
 ```
 
-Based on hyperparameter tuning, the best random forest model uses mtry = 15 and min_n = 11.
+Based on hyperparameter tuning, the best random forest model uses mtry = 15 and min_n = 11. This means it has selected 15 preductors to be randomly sampled when splitting before each tree model and 11 minimum data points needed to do further splits.
 
 ### Implementing best hyperparameters based on tuning
 
