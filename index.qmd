@@ -964,14 +964,16 @@ We could throw out some hypotheses here like since there are more housing units 
 Note on methods: STEPHANIE 12/13 - I've decided to keep in downsampling because I think it's useful.
 For reference, down-sampling "randomly subset all the classes in the training set so that their class frequencies match the least prevalent class. For example, suppose that 80% of the training set samples are the first class and the remaining 20% are in the second class. Down-sampling would randomly sample the first class to be the same size as the second class (so that only 40% of the total training set is used to fit the model)."
 
-## Visualizing Important Variables
+## Visualize Important Variables
 
 ```{r fig.width = 9, fig.height = 8}
 #| label: "Mapping important variables"
 
 dt_fitting |>
   extract_fit_parsnip() |>
-   vip(num_features = 10)
+  vip(num_features = 10) +
+  labs(title = "Top Predictors in Decision Tree Model") +
+  ylab("Variable")
 
 canopy_map <- dc_full_data |> ggplot() +
   geom_sf(aes(fill = utc_pct)) +
@@ -981,11 +983,11 @@ canopy_map <- dc_full_data |> ggplot() +
     ) +
   theme_void() +
   labs(
-    title = "Percentage of tree canopy",
-    subtitle = "by Block Group",
+    title = "Percentage of Tree Canopy",
+    subtitle = "By Block Group",
     fill = "Percent Area",
-    caption = paste0("Source: DC Open Data Urban Tree Canopy by Census Block",
-                        " Group, 2020, and Portland State University"))
+    caption = paste0("\nSource: DC Open Data\nUrban Tree Canopy by\nCensus Block",
+                        " Group, 2020,\nand Portland State University\n\n"))
 
 planting_map <- dc_full_data |> ggplot() +
   geom_sf(aes(fill = overall)) +
@@ -995,11 +997,11 @@ planting_map <- dc_full_data |> ggplot() +
     ) +
   theme_void() +
   labs(
-    title = "Tree planting suitability score",
-    subtitle = "by Block Group",
+    title = "Tree Planting Suitability Score",
+    subtitle = "By Block Group",
     fill = "Score",
-    caption = paste0("Source: DC Open Data Urban Tree Canopy by Census Block",
-                        " Group, 2020, and Portland State University"))
+    caption = paste0("\nSource: DC Open Data\nUrban Tree Canopy by\nCensus Block",
+                        " Group, 2020,\nand Portland State University\n\n"))
 
 impervious_map <- dc_full_data |> ggplot() +
   geom_sf(aes(fill = to_ia_pct)) +
@@ -1009,11 +1011,11 @@ impervious_map <- dc_full_data |> ggplot() +
     ) +
   theme_void() +
   labs(
-    title = "Percentage covered by impervious surfaces",
-    subtitle = "by Block Group",
+    title = "Percentage Covered By\nImpervious Surfaces",
+    subtitle = "By Block Group",
     fill = "Percent Area",
-    caption = paste0("Source: DC Open Data Urban Tree Canopy by Census Block",
-                        " Group, 2020, and Portland State University"))
+    caption = paste0("\nSource: DC Open Data\nUrban Tree Canopy by\nCensus Block",
+                        " Group, 2020,\nand Portland State University"))
 
 housing_map <- dc_full_data |> ggplot() +
   geom_sf(aes(fill = hous_units_per_person)) +
@@ -1023,11 +1025,10 @@ housing_map <- dc_full_data |> ggplot() +
     ) +
   theme_void() +
   labs(
-    title = "Housing units per person",
-    subtitle = "by Block Group",
+    title = "Housing Units Per Person",
+    subtitle = "By Block Group",
     fill = "# Housing Units",
-    caption = "ACS 2016-2020"
-  )
+    caption = paste0("Source: Census American\nCommunity Survey, 2016-2020"))
 
 canopy_map + planting_map + impervious_map + housing_map
 
@@ -1109,9 +1110,10 @@ names(dt_predictions) <- names(dt_predictions) |>
   str_replace(" ", "_")
 
 # Printing a few predictions
-dt_predictions |>
-  select(hotspot, .pred_class, .pred_hotspot, .pred_not_hotspot) |>
-  print(n = 20)
+dt_preds <- dt_predictions |>
+  select(hotspot, .pred_class, .pred_hotspot, .pred_not_hotspot)
+
+kable(dt_preds[1:20,])
 
 ```
 
@@ -1137,17 +1139,17 @@ Calculate accuracy, precision, and recall/sensitivity:
 ```{r}
 #| label: "Calculating accuracy, precision, recall"
 
-yardstick::accuracy(data = dt_predictions,
+kable(yardstick::accuracy(data = dt_predictions,
           truth = hotspot,
-          estimate = .pred_class)
+          estimate = .pred_class))
 
-yardstick::precision(data = dt_predictions,
+kable(yardstick::precision(data = dt_predictions,
           truth = hotspot,
-          estimate = .pred_class)
+          estimate = .pred_class))
 
-yardstick::recall(data = dt_predictions,
+kable(yardstick::recall(data = dt_predictions,
      truth = hotspot,
-     estimate = .pred_class)
+     estimate = .pred_class))
 
 ```
 
@@ -1244,7 +1246,7 @@ rf_resamples <- tune_grid(
 )
 
 # Showing the best hyperparameters based on model performance
-show_best(rf_resamples)
+kable(show_best(rf_resamples))
 
 ```
 
@@ -1287,33 +1289,49 @@ rf_resamples <- dc_rf_workflow |>
 #| label: "RMSE for each resample of each model"
 
 # Linear Regression: Calculate and plot the RMSE for each resample
+kable(collect_metrics(
+  dc_lm_resamples, 
+  summarize = FALSE) |>
+  filter(.metric == "rmse"))
+
 collect_metrics(
   dc_lm_resamples, 
   summarize = FALSE) |>
   filter(.metric == "rmse") |>
-  print() |>
   ggplot(mapping = aes(x = id, y = .estimate, group = .metric)) +
   geom_point() +
-  geom_line()
+  geom_line() +
+  theme_void() +
+  labs(
+    title = "RMSE of Linear Regression Model Fits Across Folds") +
+  xlab("Fold") +
+  ylab("RMSE")
 
 # Random Forests: Calculate and plot the RMSE for each resample
+kable(rf_resamples |>
+  collect_metrics(summarize = FALSE) |>
+  filter(.metric == "rmse"))
+
 rf_resamples |>
   collect_metrics(summarize = FALSE) |>
   filter(.metric == "rmse") |>
-  print() |>
   ggplot(mapping = aes(x = id, y = .estimate, group = .metric)) +
   geom_point() +
-  geom_line()
+  geom_line() +
+  theme_void() +
+  labs(
+    title = "RMSE of Random Forest Model Fits Across Folds") +
+  xlab("Fold") +
+  ylab("RMSE")
 
 
 # Compare average rmse
-bind_rows(
+kable(bind_rows(
   "Linear regression" = collect_metrics(dc_lm_resamples) |>
     filter(.metric == "rmse"), 
   'Random forest' = collect_metrics(rf_resamples) |>
     filter(.metric == "rmse"),
-  .id = "model"
-)
+  .id = "model"))
 
 ```
 
@@ -1340,9 +1358,9 @@ lm_final_fit <-
   last_fit(dc_split) 
 
 # Collect metrics for RMSE
-lm_final_fit |>
+kable(lm_final_fit |>
   collect_metrics() |>
-  filter(.metric == "rmse")
+  filter(.metric == "rmse"))
 
 # Make predictions with the testing data
 lm_predictions <- bind_cols(
@@ -1352,16 +1370,16 @@ lm_predictions <- bind_cols(
 )
 
 # Display the first 10 predictions against the actual values
-select(lm_predictions, uhi, starts_with(".pred"))
+kable(select(lm_predictions, uhi, starts_with(".pred")))
 
 # Interrogate which values were incorrectly predicted to the nearest tenth
-lm_predictions |>
+kable(lm_predictions |>
   select(uhi, .pred) |>
   mutate(.pred = round(lm_predictions$.pred, 1),
          uhi = round(lm_predictions$uhi, 1),
          correct = if_else(.pred == uhi, "Yes", "No"
          )) |>
-  count(correct)
+  count(correct))
 
 ```
 
@@ -1381,7 +1399,10 @@ lm_final_fit |>
     Variable = fct_reorder(.x = Importance, .f = Variable)
   ) |>
   ggplot(aes(Importance, Variable)) +
-  geom_col()
+  geom_col() +
+  theme_void() +
+  labs(
+    title = "Top Predictors in Linear Regression Model")
 
 ```
 
