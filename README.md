@@ -17,5 +17,3 @@ In order to replicate this project, you have to download the following datasets:
   * This dataset is used to extract DC ward boundaries.
 * 2016-2020 American Community Survey: [Get an API key here](https://api.census.gov/data/key_signup.html)
   * This is extracted using a Census API call in the r code. 
-
-
