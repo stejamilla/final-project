@@ -156,7 +156,7 @@ STEPHANIE 12/16 - I also don't know if we need to show this code block - we used
 
 
 # Secure Census API key (from .env file) for use in Census API call
-
+load_dot_env()
 credential <- Sys.getenv("census_api_key")
 
 # Create url for API call
