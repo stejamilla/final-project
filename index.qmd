@@ -129,6 +129,7 @@ Load select Census ACS 5-yr 2016 - 2020 variables via API
 #| label: "Load ACS data"
 
 # Secure Census API key (from .env file) for use in Census API call
+load_dot_env()
 credential <- Sys.getenv("census_api_key")
 
 # Create url for API call
@@ -1290,7 +1291,7 @@ kable(show_best(rf_resamples))
 
 ```
 
-Based on hyperparameter tuning, the best random forest model uses mtry = 15 and min_n = 4. This means it has selected 15 predictors to be randomly sampled when splitting before each tree model and 4 minimum data points needed to do further splits.
+Based on hyperparameter tuning and the most recent rendering of this document, the best random forest model uses mtry = 15 and min_n = 8. This means it has selected 15 predictors to be randomly sampled when splitting before each tree model and 8 minimum data points needed to do further splits.
 
 ### Implementing best hyperparameters based on tuning
 
@@ -1301,7 +1302,7 @@ Based on hyperparameter tuning, the best random forest model uses mtry = 15 and 
 dc_rf_model <- rand_forest(
   trees = 200,
   mtry = 15,
-  min_n = 4
+  min_n = 8
 ) |>
   set_mode(mode = "regression") |>
   set_engine(
@@ -1466,20 +1467,32 @@ If the DC government is interested in using or adapting this model, we do have s
 
 # Sources
 
-https://www.climatecentral.org/climate-matters/urban-heat-islands-2024
+Arizona State Climate Office.
+“Urban Heat Island.” Accessed December 17, 2024.
+<https://globalfutures.asu.edu/azclimate/urban-heat-island/>.
 
-https://opendata.dc.gov/datasets/DCGIS::urban-tree-canopy-by-census-block-group-in-2020/about
+“SUPR Lab Research.” Accessed December 17, 2024.
+<https://climatecope.research.pdx.edu/>.
 
-Census ACS 5yr 2016 - 2020
+“Urban Heat Island/UHI Index 2018 (Portland State University) \| Tacoma Open Data.” Accessed December 17, 2024.
+<https://data.cityoftacoma.org/datasets/tacoma::urban-heat-island-uhi-index-2018-portland-state-university/about>.
 
-https://www2.census.gov/programs-surveys/acs/tech_docs/accuracy/MultiyearACSAccuracyofData2020.pdf
+“Urban Tree Canopy by Census Block Group in 2020.” Vector digital data, April 5, 2022.
+<https://opendata.dc.gov/datasets/DCGIS::urban-tree-canopy-by-census-block-group-in-2020/about>.
 
-http://bit.ly/3DnlfIh
+US Census Bureau.
+“American Community Survey: 5-Year Estimates: Detailed Tables 5-Year.” Accessed December 17, 2024.
+<https://api.census.gov/data/2020/acs/acs5.html>.
 
-https://climatecope.research.pdx.edu/
+US Census Bureau.
+"American Community Survey: Multiyear Accuracy of the Data (5-year 2016-2020)." Accessed December 17, 2024.
+<https://www2.census.gov/programs-surveys/acs/tech_docs/accuracy/MultiyearACSAccuracyofData2020.pdf>
 
-https://globalfutures.asu.edu/azclimate/urban-heat-island/ 
+“Notes on ACS Estimate and Annotation Values.” Census.gov.
+Accessed December 17, 2024.
+<https://www.census.gov/data/developers/data-sets/acs-1year/notes-on-acs-estimate-and-annotation-values.html>.\
 
-https://www.epa.gov/heatislands/what-are-heat-islands
-
-https://data.cityoftacoma.org/datasets/tacoma::urban-heat-island-uhi-index-2018-portland-state-university/about
+US EPA, OAR.
+“What Are Heat Islands?”
+Overviews and Factsheets, June 17, 2014.
+<https://www.epa.gov/heatislands/what-are-heat-islands>.
