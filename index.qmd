@@ -401,7 +401,7 @@ STEPHANIE 12/16 - I for the life of me cannot find more information about the me
 MADELEINE 12/14: I split up the join from the metrics because the ward-level imputation has to happen in between (after join, before metrics).
 
 ```{r}
-#| label: "Create final dataset"
+#| label: "Stitching the datasets together"
 
 dc_full_data <- left_join(landcover, acs_data, by = "block_group") 
 
@@ -545,16 +545,13 @@ dc_full_data <- dc_full_data|>
 
 ## Evaluating imputation via visualization
 
-Missing data have been imputed using the next smallest geography available. In order to assess the accuracy of these imputations, we plot the variables with imputed values against another variable with no imputed values, one which should have some correlation with the partially imputed variable. We can then see if the imputed values follow the general trend of the correlation or not.
+Missing data have been imputed using the next smallest geography available. In order to assess the accuracy of these imputations, we plot the variables with imputed values against another variable with no imputed values, one which should have some correlation or general relation with the partially imputed variable. We can then see if the imputed values follow the general trend of the correlation or not.
 
 STEPHANIE 12/16 - I'm torn between just choosing one visualization per imputated variable or keeping in all of these and then providing comments on each of them in the body of the Quarto doc (aka not using # in the code chunks). Either way, I think we should split up the below code chunks for each visualization we keep in and then provide a bit of commentary after each one for interpretation of the graph.
-
 I've also modeled a cleaned version of the evaluation data visualization for the code in the chunk after "# % rent burdened vs. POC ratio" which we can replicate for the visualizations we want to keep.
 
 ```{r}
-#| label: "Evaluating imputation"
-
-#### PERCENT RENT BURDENED ####
+#| label: "Evaluating imputation for percent rent burdened variable"
 
 # It was harder finding variables that are clearly correlated with this than it 
 # was for some of the other partially-imputed variables. These are the most
@@ -587,8 +584,10 @@ dc_full_data |> ggplot() +
 # All the outliers here (rent_burden_pct = 1 or = 0) are not imputed values.
 # Wouldn't want to rely on this alone since we impute using ward-level means
 # in a few cases, but alongside the other charts, it provides further reassurance.
+```
 
-#### MEDIAN HOUSEHOLD INCOME ####
+```{r}
+#| label: "Evaluating imputation for median household income"
 
 # Median household income vs. POC ratio
 dc_full_data |> ggplot() +
@@ -621,8 +620,10 @@ dc_full_data |> ggplot() +
   )
 # This looks good to me too. Really no imputed values are outliers in their ward.
 
+```
 
-#### MEDIAN PROPERTY VALUE ####
+```{r}
+#| label: "Evaluating imputation for median property value"
 
 # Median property value vs. POC ratio
 dc_full_data |> ggplot() +
@@ -662,14 +663,6 @@ dc_full_data <- dc_full_data |>
 
 
 ## Prepare the data for analysis (set seed & splitting)
-
-JAMIE 12/12 - Changed the var names so that these are the splits we use for all models, not just decision tree
-
-* Do we need an implementation set too?
-
-STEPHANIE 12/13 - Aaron mentioned that we should make sure that when we split the data, that we should stratify the data by some geographic feature so that for example not all the block groups in a certain ward are only in the training data. Because then our model would only really work for that ward. Thus, the argument strata = ward.
-* Concerning implementation data, I worry that since we only have a set of n = 571 that taking out a number would significantly affect our model. Maybe we can just do a set of 10 data points for the implementation data like we did in Assignment 7, but we'd have to randomize which ten are taken out (which we didn't do in assignment 7, we sliced the data by where observations were located in the dataset)
-
 
 ```{r}
 #| label: "Split into training and testing"
