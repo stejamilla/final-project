@@ -1,6 +1,6 @@
 # Predictive Modeling of Urban Heat Hotspots in Washington, DC
 ## PPOL 6803: Data Science for Public Policy
-Authors: Madeleine Adelson, Stephanie Jamilla, and Jamie Jelly Murtha
+Authors: Madeleine Adelson, Stephanie Jamilla, and Jamie Jelly Murtha\
 GitHub Pages Link: https://stejamilla.github.io/final-project/
 
 This year, DC [reached a record high temperature](https://www.washingtonpost.com/weather/2024/07/16/dc-heat-100-record-high-temperatures/) of 104 degrees in July, matching a previous record in 1988 and after having gone eight years without breaking 100 degrees. This sparked wide public discourse about the adverse effects of heat on the health and safety of communities, some of whom may be disproportionately affected by the rising temperatures. 
@@ -12,8 +12,8 @@ We first build a decision tree model to determine whether or not a block group i
 In order to replicate this project, you have to download the following datasets:
 * Urban Tree Canopy by Census Block Group in 2020 (DC Open Data): [Download the Shapefile data type](https://opendata.dc.gov/datasets/DCGIS::urban-tree-canopy-by-census-block-group-in-2020/about)
 * Urban Tree Canopy by Census Block Group in 2020 (DC Open Data): [Download the Shapefile data type](https://opendata.dc.gov/datasets/DCGIS::urban-tree-canopy-by-ward-in-2020/about)
-⋅⋅* This dataset is used to extract DC ward boundaries.
+  * This dataset is used to extract DC ward boundaries.
 * 2016-2020 American Community Survey: [Get an API key here](https://api.census.gov/data/key_signup.html)
-⋅⋅* This is extracted using a Census API call in the r code. 
+  * This is extracted using a Census API call in the r code. 
 
 
