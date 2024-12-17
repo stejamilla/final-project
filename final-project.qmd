@@ -16,7 +16,7 @@ toc: true
 ---
 
 # About This Project
-Urban environments tend to retain heat due to having less tree/vegetation cover, more impervious surfaces such as asphalt, and other factors. Using data on DC's landcover, we built and tested three different models to predict where hotspots are most likely to occur within the District. We also included several variables from the American Community Survey (ACS) to test whether demographic characteristics could also be predictive of hotspots. Our analysis is at the block group level.
+Urban environments tend to retain heat due to having less tree and/or vegetation cover, more impervious surfaces such as asphalt, and other factors. Using data on DC's landcover, we built and tested three different models to predict where hotspots are most likely to occur within the District. We also included several variables from the American Community Survey (ACS) to test whether demographic characteristics could also be predictive of hotspots. Our analysis is at the block group level.
 
 # Setup
 
@@ -905,7 +905,9 @@ dc_train <- dc_train |>
     -pop_density_water_sq_mi) 
 
 # V-fold cross validation with 10 folds
-dc_folds <- vfold_cv(data = dc_train, v = 10)
+dc_folds <- vfold_cv(data = dc_train, 
+                     v = 10,
+                     strata = ward)
 
 ```
 
@@ -1369,9 +1371,7 @@ STEPHANIE 12/16 - I'm a bit concerned how the regression model correctly predict
 
 lm_final_fit |>
   extract_fit_parsnip() |>
-  vip(num_features = 20) 
-
-%>%
+  vip(num_features = 20) %>%
   .$data |>
   mutate(
     Importance = Importance / max(Importance),
