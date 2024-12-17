@@ -1004,6 +1004,7 @@ rpart.plot::rpart.plot(x = dt_fitting$fit$fit$fit,
 
 The first decision point is whether the percentage of the block group that's covered by tree canopy; if it's greater or equal to 23% then it's not a hotspot.
 If it is less than 23%, then you check how suitable the block group is for tree planting "based on a weighted formula that includes all planting prioritization categories." If the score is less than 7, then it's a not hotspot.
+
 If it's greater than or equal to seven, you check the percent of total area that's covered by all combined impervious surfaces.
 If the percentage is less than 66%, then it's not a hotspot.
 If it's greater than or equal to 66%, then the final check is whether the number of housing units per person is less than 0.74. If it's greater than or equal to 0.75, then it's not a hotspot. If it is less than 0.74 then it is a hotspot.
@@ -1200,8 +1201,7 @@ kable(yardstick::recall(data = dt_predictions,
 
 ```
 
-Accuracy and recall are relatively high at 87.9% and 94.1%, respectively. This means that the model works relatively well in correctly classifying whether or not a block group is a hotspot and in specifically correctly identifying hotspots when that block group actually is a hotspost. Precision is not as high at 55.2%, since there were 13 instances in which the model predicted a block group is a hotspot when in reality it was not one. One possible way to improve the model is to adjust the threshold used to determine whether a block group is a hotspot or not. Another idea may be to examine the predictors used and adjust which ones should be included or not.
-For example, we made an assumption that using percentage area of the landcover variables rather than the total area variables (e.g., we chose percentage of area covered by canopy rather than total area covered by canopy) to allow consistency across block groups who vary in total area size. Perhaps it would be worth investigating the performance of this model using the total area variables instead or even alongside the percentage variables.
+Accuracy and recall are relatively high at 87.9% and 94.1%, respectively. This means that the model works relatively well in correctly classifying whether or not a block group is a hotspot and in specifically correctly identifying hotspots when that block group actually is a hotspost. Precision is not as high at 55.2%, since there were 13 instances in which the model predicted a block group is a hotspot when in reality it was not one. One possible way to improve the model is to adjust the threshold used to determine whether a block group is a hotspot or not. Another idea may be to examine the predictors used and adjust which ones should be included or not. For example, we made an assumption that using percentage area of the landcover variables rather than the total area variables (e.g., we chose percentage of area covered by canopy rather than total area covered by canopy) to allow consistency across block groups who vary in total area size. Perhaps it would be worth investigating the performance of this model using the total area variables instead or even alongside the percentage variables.
 
 # Linear Regression and Random Forest Models
 
@@ -1462,7 +1462,7 @@ Of the 54 predictors fed into each model, the linear regression model identified
 <br>
 * TO_UN_PCT: The percentage of land area in the assessment boundary that is considered unsuitable for planting. This includes buildings and roads, barren soil and dry vegetation, as well as sports fields, golf course playing areas, airports, agricultural land, wetlands and any other land identified as unsuitable.
 <br><br>
-In practice, before implementing the model, we would need to explore the definitions of all landcover variables as well as their data collection context more closely with the District. Little information is available publicly on each variable beyond a set of [basic definitions](https://www.arcgis.com/sharing/rest/content/items/ccfacf902195465c8a823ca88f835ac2/info/metadata/metadata.xml?format=default&output=html). Further, many of these top variables seem to be plausibly related to each other, even though we included step_corr() in our recipe.
+In practice, before implementing the model, we would need to explore the definitions of all landcover variables as well as their data collection context more closely with the District. Little information is available publicly on each variable beyond a set of [basic definitions](https://www.arcgis.com/sharing/rest/content/items/ccfacf902195465c8a823ca88f835ac2/info/metadata/metadata.xml?format=default&output=html). Further, many of these top variables seem to be plausibly related to each other, even though we included step_corr() in our recipe. This warrants further investigation of how step_corr() removes correlated variables and the relationships among the remaining variables.
 
 # Practical Use of the Model
 
