@@ -144,7 +144,7 @@ STEPHANIE 12/16 - I also don't know if we need to show this code block - we used
 
 
 # Secure Census API key (from .env file) for use in Census API call
-
+load_dot_env()
 credential <- Sys.getenv("census_api_key")
 
 # Create url for API call
@@ -1250,7 +1250,7 @@ It looks like mtry = 15 and min_n = 11 are the best options.
 dc_rf_model <- rand_forest(
   trees = 200,
   mtry = 15,
-  min_n = 1
+  min_n = 11
 ) |>
   set_mode(mode = "regression") |>
   set_engine(
@@ -1356,9 +1356,6 @@ lm_predictions |>
          correct = if_else(.pred == uhi, "Yes", "No"
          )) |>
   count(correct)
-
-# Collecting RMSE of estimates
-kable(rmse(actual = lm_predictions$uhi, predicted = lm_predictions$.pred))
 
 ```
 STEPHANIE 12/16 - I'm a bit bewildered how the regression model correctly predicts ALL uhi values when rounded to the nearest tenth...is this possible?! When you round to the nearest hundreth, it still gets 109 of 116 correct. But then by the thousandth it goes to only 73 correct.
