@@ -841,47 +841,66 @@ Temperature & income/education:
 #| label: "Mapping temperature (UHI) against income and education"
 
 # Median household income
-dc_train |>
+mhi_eda <- dc_train |>
   ggplot(aes(x = med_hhi, y = uhi, color = hotspot)) +
   geom_point(alpha = 0.5) +
-  theme_minimal()
+  theme_minimal() +
+  labs(title = "UHI and median household income",
+       subtitle = "by Block Group",
+       caption = "Sources: ACS 2016-2020, DC Open Data",
+       color = "Hotspot") +
+  xlab("Household Income") +
+  ylab("UHI")
 
 # Ratio of bachelors degrees
-dc_train |>
+bach_eda <- dc_train |>
   ggplot(aes(x = ed_bach_ratio, y = uhi, color = hotspot)) +
   geom_point(alpha = 0.5) +
-  theme_minimal()
+  theme_minimal() +
+    labs(title = "UHI and college degree attainment",
+       subtitle = "by Block Group",
+       caption = "Sources: ACS 2016-2020, DC Open Data",
+       color = "Hotspot") +
+  xlab("Proportion of population with a bachelor's degree") +
+  ylab("UHI")
+
+mhi_eda + bach_eda
 
 ```
+Similarly, variables indicating economic status and educational attainment do not show strong relationship with UHI.
 
 Temperature & landcover:
-
 ```{r}
 #| label: "Mapping landcover variables"
 
-# Comparing with percentage of non-canopy vegetation
-dc_train |>
-  ggplot(aes(x = veg_pct, y = uhi, color = hotspot)) +
-  geom_point(alpha = 0.5) +
-  theme_minimal()
-
-# Comparing with percentage area of urban tree canopy
-dc_train |>
+# Percentage area of urban tree canopy
+utc_eda <- dc_train |>
   ggplot(aes(x = utc_pct, y = uhi, color = hotspot)) +
   geom_point(alpha = 0.5) +
-  theme_minimal()
-
-# Comparing with percentage area of impervious surfaces (e.g., roads, parking
-# lots, etc.)
-dc_train |>
+  theme_minimal() +
+  labs(title = "UHI and urban tree canopy",
+       subtitle = "by Block Group",
+       caption = "Source: DC Open Data",
+       color = "Hotspot") +
+  xlab("% land area covered by urban tree canopy") +
+  ylab("UHI")
+  
+# Percentage area of impervious surfaces
+imp_eda <- dc_train |>
   ggplot(aes(x = to_ia_pct, y = uhi, color = hotspot)) +
   geom_point(alpha = 0.5) +
-  theme_minimal()
+  theme_minimal() +
+  labs(title = "UHI and impervious surfaces",
+       subtitle = "by Block Group",
+       caption = "Source: DC Open Data",
+       color = "Hotspot") +
+  xlab("% land area covered by impervious surfaces") +
+  ylab("UHI")
+
+utc_eda + imp_eda
 
 ```
-
-STEPHANIE 12/13 - The graphs that compare UHI with percentage area of urban tree canopy and of impervious surfaces seems quite compelling.
-This makes sense, and it's interesting to notice how not a lot of the demographic stuff doesn't seem to show up in EDA but the landcover stuff seem like promising predictors.
+Meanwhile, landcover variables show a potentially strong relationship with UHI. Generally, it seems that as urban tree canopy area increases, UHI decreases. Conversely, as the percent area of impervious surfaces (e.g., roads, parking lots, etc.) increases, UHI also increases. This may indicate that landcover variables may hold more importance in our models compared to demographic ones.
 
 # Preparation for Modeling
 
