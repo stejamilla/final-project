@@ -144,7 +144,7 @@ STEPHANIE 12/16 - I also don't know if we need to show this code block - we used
 
 
 # Secure Census API key (from .env file) for use in Census API call
-load_dot_env()
+
 credential <- Sys.getenv("census_api_key")
 
 # Create url for API call
@@ -302,13 +302,14 @@ When selecting which ACS variables to use, we wanted to include various characte
 
 ### Data Imputation Part 1
 
-IMPUTATION
 The imputation logic works as follows:
-1) If data is missing at the block group level, use the mean for that block group's census tract.
+1) If data is missing at the block group level, the NA block group is assigned the mean value of the variable from neighboring block groups who share a census tract.
 
-2) If data is still missing at the census tract level, use the mean for that census tract's ward. (This happens further down in the code.)
+2) If data is still missing at the census tract level, use the mean for neighboring tracts in the corresponding ward. (This happens in the "Data Imputation Part 2" section below.)
 
-This method is imperfect for two reasons:
+We recognize that this method is imperfect. If, for example, if within a ward, we had to impute data for a couple block groups based on tract-level averages and then impute data for other block groups based on the ward-level average, then that means the ward-level average for a block group was created partially by 
+
+for two reasons:
 1) Imputed values at the census tract level feed into imputation at the ward level. For instance, say a ward is made up of 4 census tracts and each tract has 4 block groups. Initially, only 2/4 tracts have complete data. After imputing at the tract level, 3/4 are complete. When we go to impute the data for the final tract, that calculation will include the values we imputed for the other missing tract. I don't think this is that big of a deal, especially because the numbers of values that need to be imputed at the ward level is pretty small.
 
 2) Median household income and median property value are top- and bottom-coded (no one has an income less than $2,499 or greater than $250,000). The only way around this I can think of would be to choose one or more cutoffs as I did with the rent burden variable (for example, categorize income into "high income" and "low income"). I didn't do this because I wasn't sure what those cutoffs would be. I'm also not really sure how much it matters, since either way we can't capture the real high- and low-end incomes.
@@ -1124,17 +1125,16 @@ conf_mat(data = dt_predictions,
 Calculating accuracy, precision, and recall/sensitivity:
 ```{r}
 #| label: "Calculating accuracy, precision, recall"
-#| eval: false
 
-accuracy(data = dt_predictions,
+yardstick::accuracy(data = dt_predictions,
           truth = hotspot,
           estimate = .pred_class)
 
-precision(data = dt_predictions,
+yardstick::precision(data = dt_predictions,
           truth = hotspot,
           estimate = .pred_class)
 
-recall(data = dt_predictions,
+yardstick::recall(data = dt_predictions,
      truth = hotspot,
      estimate = .pred_class)
 
@@ -1250,7 +1250,7 @@ It looks like mtry = 15 and min_n = 11 are the best options.
 dc_rf_model <- rand_forest(
   trees = 200,
   mtry = 15,
-  min_n = 11
+  min_n = 1
 ) |>
   set_mode(mode = "regression") |>
   set_engine(
@@ -1299,6 +1299,7 @@ rf_resamples |>
   geom_point() +
   geom_line()
 
+
 # Comparing average rmse
 bind_rows(
   "Linear regression" = collect_metrics(dc_lm_resamples) |>
@@ -1314,18 +1315,8 @@ STEPHANIE 12/15 - Based on this, it seems that linear regression is the better m
 
 # Implement the Final Model
 
-STEPHANIE 12/13 - Setting up the final code block for when we decide which model we should make predictions from. This probably won't render because the random forest model isn't working at the time I'm writing this (7pm) 
-MADELEINE 12/15 - not sure if more needs to be done here, but when I just replace the argument of extract_workflow with dc_lm_model, I get two errors. 1) select(-hotspot): hotspot does not exist. 2) no applicable method for 'extract_workflow' applied to an object of class "c('linear_reg', 'model_spec')"
-Setting to not evaluate for now
-STEPHANIE 12/16 - I've edited this code so that it should work now.
-
 ```{r}
 #| label: "Implement final model"
-#| eval: false
-
-# Removing hotspot variable to be consistent with the recipe 
-dc_test <- dc_test |>
-  select(-hotspot)
 
 # Selecting the best resamples via select_best
 lm_best <- dc_lm_resamples |>
@@ -1366,19 +1357,19 @@ lm_predictions |>
          )) |>
   count(correct)
 
+# Collecting RMSE of estimates
+kable(rmse(actual = lm_predictions$uhi, predicted = lm_predictions$.pred))
+
 ```
-STEPHANIE 12/16 - I'm a bit concerned how the regression model correctly predicts ALL uhi values when rounded to the nearest tenth...is this possible?! When you round to the nearest hundreth, it still gets 109 of 116 correct. But then by the thousandth it goes to only 73 correct.
+STEPHANIE 12/16 - I'm a bit bewildered how the regression model correctly predicts ALL uhi values when rounded to the nearest tenth...is this possible?! When you round to the nearest hundreth, it still gets 109 of 116 correct. But then by the thousandth it goes to only 73 correct.
 
 ## Visualizing the most important predictors
 ```{r}
 #| label: "Visualize most important predictors"
-#| eval: false
 
 lm_final_fit |>
   extract_fit_parsnip() |>
-  vip(num_features = 20) 
-
-%>%
+  vip(num_features = 20) %>%
   .$data |>
   mutate(
     Importance = Importance / max(Importance),
@@ -1395,32 +1386,6 @@ STEPHANIE 12/13 - Then with the code chunk below, we should make some maps with 
 ```{r}
 
 
-
-```
-
-## Estimate the out-of-sample error rate
-
-JAMIE 12/13 - Added metrics work below
-STEPHANIE 12/15 - Sorry for my ignorance, but I'm not entirely sure what we're doing here - is it finding another metric to compare models? Based on the RMSE values above, it seems we should go with the regression model and then create predictions with that and then visualize the best predictors.
-MADELEINE 12/15 - also, this chunk does not run because dc_lm_fit is not defined. Setting it to not evaluate for now
-STEPHANIE 12/16 - I've moved this below the creating predictions chunk. I think Jamie was on the right track in that we should calculate an error rate for the linear regression model, but I think this has to come after how we made predictions.
-
-```{r}
-#| eval: false
-
-# save best lm fit
-best_lm_fit <- fit_best(dc_lm_fit, verbose = TRUE)
-
-# make predictions using best fit
-test_predictions <-
-  dc_test |>
-  select(uhi) |>
-  rename(y = uhi) |>
-  mutate(y = as.numeric(y)) |>
-  mutate(y_hat = as.numeric(as_vector(predict(best_lm_fit, dc_test))))
-
-# collect rf metrics
-kable(rmse(actual = test_predictions$y, predicted = test_predictions$y_hat))
 
 ```
 
