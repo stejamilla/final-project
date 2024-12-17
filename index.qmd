@@ -1277,7 +1277,7 @@ kable(show_best(rf_resamples))
 
 ```
 
-Based on hyperparameter tuning, the best random forest model uses mtry = 15 and min_n = 11. This means it has selected 15 preductors to be randomly sampled when splitting before each tree model and 11 minimum data points needed to do further splits.
+Based on hyperparameter tuning, the best random forest model uses mtry = 15 and min_n = 11. This means it has selected 15 predictors to be randomly sampled when splitting before each tree model and 11 minimum data points needed to do further splits.
 
 ### Implementing best hyperparameters based on tuning
 
@@ -1362,7 +1362,7 @@ kable(bind_rows(
 
 ```
 
-Based on this, it seems that linear regression is the better model over random forests by a fairly large margin, which I find interesting since I think usually random forest models out perform other models like lm and regression trees?
+The linear regression model outperforms the random forests model significantly, based on a comparison of the average root mean squared error of each model.
 
 # Implement the Final Model
 
@@ -1410,7 +1410,7 @@ kable(lm_predictions |>
 
 ```
 
-The regression model correctly predicts all uhi values when rounded to the nearest tenth. When you round to the nearest hundreth, it still gets 109 of 116 correct. But then by the thousandth it goes to only 73 correct.
+We were suprised to observe that the linear regression model predicted all UHI values, rounded to the nearest tenth. Before such a model can be implemented, further investigation of this extremely close estimation is needed. However, as we required the model to predict to larger decimals, its performance declined. It predicted 109 values (~94%) to the nearest hundredth correctly, and 73 values (~63%) to the nearest thousandth correctly.
 
 ## Visualize the Most Important Predictors
 
@@ -1426,15 +1426,23 @@ lm_final_fit |>
 
 ```
 
-Only seven variables of our 54 predictors that have large importance.
-
-STEPHANIE 12/13 - Then with the code chunk below, we should make some maps with the top \~3 variables as determined by the code chunk above
-
-```{r}
-
-
-
-```
+Of the 54 predictors fed into each model, the linear regression model identified seven key landcover variables as the most important predictors of UHI:
+<br>
+* OVERALL: The overall suitability for tree planting score of a given block group.
+<br>
+* WLDLF_CON: Available planting areas within 100’ of large canopy tracts (equal to or greater than 5 acres).
+<br>
+* ENRGY_CON: Residentially zoned areas with less than the district average tree cover and higher than average total possible planting area.
+<br>
+* LAND_OWN: Possible planting area on District owned operated or managed public & public/private land. Values are the percentage of plantable space within public land.
+<br>
+* POS_UTC: Positive urban tree canopy.
+<br>
+* STRM_WTR: Uses available planting area on, and adjacent to, impervious surfaces and surface water bodies to indicate areas where trees will more directly benefit stormwater runoff mitigation.
+<br>
+* TO_UN_PCT: The percentage of land area in the assessment boundary that is considered unsuitable for planting. This includes buildings and roads, barren soil and dry vegetation, as well as sports fields, golf course playing areas, airports, agricultural land, wetlands and any other land identified as unsuitable.
+<br><br>
+In practice, before implementing the model, we would need to explore the definitions of all landcover variables as well as their data collection context more closely with the District. Little information is available publicly on each variable beyond a set of [basic definitions](https://www.arcgis.com/sharing/rest/content/items/ccfacf902195465c8a823ca88f835ac2/info/metadata/metadata.xml?format=default&output=html). Further, many of these top variables seem to be plausibly related to each other, even though we included step_corr() in our recipe.
 
 # Practical Use of the Model
 
