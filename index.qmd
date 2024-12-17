@@ -288,18 +288,30 @@ When selecting which ACS variables to use, we wanted to include various characte
 
 ### Data Imputation Part 1
 
-The imputation logic works as follows: 1) If data is missing at the block group level, the NA block group is assigned the mean value of the variable from neighboring block groups who share a census tract.
+A few of our Census variables (rent burden, median household income, median property value) are missing data for some block groups. This seems to be due to insufficient response rates in those block groups: the standard error of the estimate was larger in magnitude than the estimate itself, so the Census Bureau suppresses that estimate. 
 
-2)  If data is still missing at the census tract level, use the mean for neighboring tracts in the corresponding ward. (This happens in the "Data Imputation Part 2" section below.)
+Nearby block groups are likely to share similar characteristics in terms of property values, median income, and rent burdens, since those tend to reflect neighborhood characteristics that exist at a larger geography than the block group. Therefore, we came up with the following imputation plan:
+
+1) If data are missing at the block group level, the NA block group is assigned the mean value of the variable from neighboring block groups who share a census tract.
+
+2)  If data are still missing at the census tract level, use the mean for neighboring tracts in the corresponding ward. (This happens in the "Data Imputation Part 2" section below.)
 
 We recognize that this method is imperfect.
-If, for example, if within a ward, we had to impute data for a couple block groups based on tract-level averages and then impute data for other block groups based on the ward-level average, then that means the ward-level average for a block group was created partially by other already-imputed values (using tract-level averages).
-However, there were only a small number of instances of these.\* Another limitation is that median househould income and median property value variables are top- and bottom-coded, meaning that imputed values (based on averages) may be lower or higher than they should be due to the top/bottom coding.
+First, ward-level imputation is less precise since wards are larger geographies. Second, the method may give too much "weight" to block groups that share a Census tract with an NA block group. For example, if within a ward we had to impute data for a couple block groups based on tract-level averages and then imputed data for other block groups based on the ward-level average, then that means the ward-level average partially was influenced by other already-imputed values (using tract-level averages).
 
-\*STEPHANIE 12/16 - Could someone check how many instances there were?
-I wrote the above based on Madeleine's notes.
+However, there were only a handful of instances of ward-level imputation for the first two variables:
 
-Imputation Part 1: Replace missing data points with tract-level data.
+* Rent burden: 7 block groups are imputed at the ward level
+
+* Median HHI: 5 block groups " "
+
+And a fairly small number for property value (less than 5% of observations):
+
+* Median property value: 27 block groups imputed at the ward level
+
+Another limitation is that median househould income and median property value variables are top- and bottom-coded, meaning that imputed values (based on averages) may be lower or higher than they should be due to the top/bottom coding.
+
+Imputation Part 1: Replace missing data points with tract-level data where available.
 
 ```{r}
 #| label: "Imputation part 1"
@@ -403,7 +415,7 @@ dc_full_data <- left_join(landcover, acs_data, by = "block_group")
 
 ## Data Imputation Part 2
 
-Imputation part 2: for any data points still missing after imputing at tract level, impute at ward level.
+Imputation part 2: for any data points still missing after imputing at tract level, we impute at the ward level.
 
 ```{r}
 #| label: "Imputation - ward level"
@@ -440,6 +452,8 @@ dc_full_data <- dc_full_data |>
 ```
 
 # Finalize the Full Dataset
+
+We create a variety of metrics using mutations of our imported data.
 
 ```{r}
 #| label: "Create metrics"
@@ -537,7 +551,7 @@ dc_full_data <- dc_full_data|>
 
 ```
 
-## Evaluate Imputation Via Visualization
+## Evaluating Imputation Via Visualization
 
 Missing data have been imputed using the next smallest geography available.
 In order to assess the accuracy of these imputations, we plot the variables with imputed values against another variable with no imputed values, one which should have some correlation or general relation with the partially imputed variable.
@@ -547,14 +561,15 @@ STEPHANIE 12/16 - I'm torn between just choosing one visualization per imputated
 Either way, I think we should split up the below code chunks for each visualization we keep in and then provide a bit of commentary after each one for interpretation of the graph.
 I've also modeled a cleaned version of the evaluation data visualization for the code in the chunk after "\# % rent burdened vs. POC ratio" which we can replicate for the visualizations we want to keep.
 
+**Rent Burden imputation evaluation**
+
+Compared to the other partially-imputed variables, it was harder to find variables that were clearly correlated with rent burden (the percentage of households in a given tract spending 30% or more of their income on rent). However, to the extent that trends could be seen in visualizations of the data, our imputed values seem to follow those trends.
+
+Rent burden vs. percent of population with a bachelor's degree:
+
 ```{r}
-#| label: "Evaluate imputation for percent rent burdened variable"
+#| label: "Evaluate imputation: rent burden vs. ed bach ratio"
 
-# It was harder finding variables that are clearly correlated with this than it 
-# was for some of the other partially-imputed variables. These are the most
-# useful results I got.
-
-# % rent burdened vs. POC ratio
 dc_full_data |> ggplot() +
   geom_point(mapping =
     aes(x = ed_bach_ratio, y = rent_burden_pct,
@@ -568,68 +583,82 @@ dc_full_data |> ggplot() +
   xlab("Proportion of Population with a Bachelor's Degree") +
   ylab("Proportion of Households with Rent Burden") +
   theme_minimal()
-# Not a super strong trend here, but all imputed data points seem to fit
-# the general shape of the data.
+```
 
-# % rent burdened vs. ward
+There is no strong trend here, but no imputed data points seem to fall outside the general shape of the data.
+
+Rent burden vs. ward: 
+
+```{r}
+#| label: "Evaluate imputation: rent burden vs. ward"
+
 dc_full_data |> ggplot() +
   geom_point(mapping =
     aes(x = ward, y = rent_burden_pct,
         color = as.character(rb_imputed))
   ) +
   labs(color = "imputed (0 = no, 1 = yes)")
-# All the outliers here (rent_burden_pct = 1 or = 0) are not imputed values.
-# Wouldn't want to rely on this alone since we impute using ward-level means
-# in a few cases, but alongside the other charts, it provides further reassurance.
+
 ```
 
-```{r}
-#| label: "Evaluate imputation for median household income"
+No imputed values fall outside the range for their ward. (Since a few imputed values were imputed at the ward level, we would not want to rely on this alone - but it provides additional reassurance alongside other comparisons.)
 
-# Median household income vs. POC ratio
+**Median household income imputation evaluation**
+
+Median household income vs. POC ratio:
+
+```{r}
+#| label: "Evaluate imputation: med HHI vs. POC ratio"
+
 dc_full_data |> ggplot() +
   geom_point(mapping =
     aes(x = race_poc_ratio, y = med_hhi,
         color = as.character(hhi_imputed))
   ) +
   labs(color = "imputed (0 = no, 1 = yes)")
-# This looks pretty promising to me in terms of the imputed values being reasonable
-# One or two semi-outliers, but imputed values generally follow trend of other data
-# Don't think we need to worry too much about values where x = 0;
-# these likely had no population data or actually no population
 
-# Median household income vs. bachelor's degree ratio
+```
+
+There is a clear negative correlation between median household income and POC ratio. The imputed data points seem to follow this trend. There is one datapoint where race_poc_ratio = 0 and imputed med_hhi looks to be somewhat too low - but this was a block group with zero reported population, so it's not surprising that household income would not be accurate here. Moreover, since it's only one data point, we are not too worried about systematic inaccuracy of the imputed values.
+
+Median household income vs. percent of population with a bachelor's degree:
+
+```{r}
+#| label: "Evaluate imputation: med HHI vs. ed bach ratio"
+
 dc_full_data |> ggplot() +
   geom_point(mapping =
     aes(x = ed_bach_ratio, y = med_hhi,
         color = as.character(hhi_imputed))
   ) +
   labs(color = "imputed (0 = no, 1 = yes)")
-# The outlier here is really just an outlier on in terms of ed_bach_ratio.
-# Arguably the imputed med_hhi should have been higher, but not sure how much
-# of an issue this is considering it's only one data point.
-
-# Median household income vs. ward
-dc_full_data |> ggplot() +
-  geom_point(mapping =
-    aes(x = ward, y = med_hhi,
-        color = as.character(hhi_imputed))
-  )
-# This looks good to me too. Really no imputed values are outliers in their ward.
 
 ```
 
-```{r}
-#| label: "Evaluate imputation for median property value"
+There is less of a strong correlation here, but again, the imputed data points seem to fit the overall trend. There is an outlier in terms of ed_bach_ratio (= 1.00); arguably this should have had a larger value for med_hhi, but again, it is just one data point.
 
-# Median property value vs. POC ratio
+**Median property value imputation evaluation**
+
+Median property value vs. POC ratio:
+
+```{r}
+#| label: "Evaluate imputation: med property value vs. POC ratio"
+
 dc_full_data |> ggplot() +
   geom_point(mapping =
     aes(x = race_poc_ratio, y = med_prop_val,
         color = as.character(propval_imputed))
   ) +
   labs(color = "imputed (0 = no, 1 = yes)")
-# Imputed values seem to fit trend of data quite well.
+
+```
+
+There is a clear negative relationship between median property value and race_poc_ratio. The imputed data points seem to follow this trend.
+
+Median property value vs. percent of population with a bachelor's degree:
+
+```{r}
+#| label: "Evaluate imputation: med property value vs. ed bach ratio"
 
 # Median property value vs. bachelor's degree ratio
 dc_full_data |> ggplot() +
@@ -638,19 +667,16 @@ dc_full_data |> ggplot() +
         color = as.character(propval_imputed))
   ) +
   labs(color = "imputed (0 = no, 1 = yes)")
-# Slightly weirdly shaped data, but the imputed points do not seem to be
-# outside the trend. Only outlier is on the ed_bach_ratio var.
 
-# Median property value vs. ward
-dc_full_data |> ggplot() +
-  geom_point(mapping =
-    aes(x = ward, y = med_prop_val,
-        color = as.character(propval_imputed))
-  ) +
-  labs(color = "imputed (0 = no, 1 = yes)")
-# No imputed values are outliers in their ward.
+```
 
-# Remove indicator variables for imputation
+The trend here is not as clear, but there seems to be a positive relationship between med_prop_val and ed_bach_ratio, and the imputed data points follow this trend. Again, we have one potentially suspicious data point for which ed_bach_ratio = 1.00 and imputed med_prop_val should perhaps be higher, but it's a single data point.
+
+After performing these analysis, we remove the imputation indicator variables:
+
+```{r}
+#| label: "Remove imputation indicator variables"
+
 dc_full_data <- dc_full_data |>
   select(-rb_imputed,
          -hhi_imputed,
