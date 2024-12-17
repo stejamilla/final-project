@@ -122,20 +122,10 @@ acs_variables <- load_variables(2020, "acs5") |>
 
 ```
 
-MADELEINE PRE-12/12: \* It occurs to me we may need to choose baseline categories for any categorical variables we include and leave those out?
-Not sure if that is only a requirement for line and linear regression?
-JAMIE 12/12 - Good point!
-I'm adding stuff in below without factoring that in for now, but I think we def need to determine if we need to deal with this!
-STEPHANIE 12/13 - I'm not too concerned about this because we've never had to address categorical variables in the assignments.
-We can do something like "step_dummy()" if we want to recode a categorical variable into a dummy instead.
-
-STEPHANIE 12/16 - I also don't know if we need to show this code block - we used it to look through various variables but we could probably cut this and instead explain in words why we chose the variables we did.
-
-### Load Census Demographic Data via API
+### Load select Census ACS 5-yr 2016 - 2020 variables via API
 
 ```{r}
 #| label: "Load ACS data"
-
 
 # Secure Census API key (from .env file) for use in Census API call
 load_dot_env()
@@ -225,7 +215,7 @@ names(acs_data) <- acs_matrix[1, ] |>
 
 ```
 
-Label and clean ACS variables:
+Label and clean select ACS variables for model, or to be used in new measure variables for model:
 
 ```{r}
 #| label: "Clean ACS data"
@@ -293,11 +283,7 @@ acs_data <- acs_data |>
          )
 ```
 
-When selecting which ACS variables to use, we wanted to include various characteristics of block groups.
-We chose to include total population and racial disaggregation of population to understand how the volume of population could affect temperature and if demographics of that population could be an important predictor.
-Levels of education are another way to understand the population in the block group, especially if people of similar levels of educational attainment live close to each other.
-Median household income and rent burden are economic indicators and consider how economic conditions could affect the conditions of a block group.
-Lastly, number of housing units, vacant units, occupied units, and median property value all economic characteristics of the block group (rather than the people), that may contribute to the physical environment of that block group.
+When selecting which ACS variables to use, we wanted to include various characteristics of block groups. We chose to include total population and racial disaggregation of population to understand how the volume of population could affect temperature and if demographics of that population could be an important predictor. Levels of education are another way to understand the population in the block group, especially if people of similar levels of educational attainment live close to each other. Median household income and rent burden are economic indicators and consider how economic conditions could affect the conditions of a block group. Lastly, number of housing units, vacant units, occupied units, and median property value are all economic characteristics of the block group (rather than their residents), that may contribute to the physical environment of that block group.
 
 ### Data Imputation Part 1
 
@@ -312,7 +298,7 @@ However, there were only a small number of instances of these.\* Another limitat
 \*STEPHANIE 12/16 - Could someone check how many instances there were?
 I wrote the above based on Madeleine's notes.
 
-Imputation part 1: replace missing data points with tract-level data.
+Imputation Part 1: Replace missing data points with tract-level data.
 
 ```{r}
 #| label: "Imputation part 1"
