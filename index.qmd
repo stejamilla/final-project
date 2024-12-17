@@ -973,7 +973,8 @@ dt_fitting |>
   extract_fit_parsnip() |>
   vip(num_features = 10) +
   labs(title = "Top Predictors in Decision Tree Model") +
-  ylab("Variable")
+  ylab("Importance") +
+  xlab("Variable")
 
 canopy_map <- dc_full_data |> ggplot() +
   geom_sf(aes(fill = utc_pct)) +
@@ -1392,17 +1393,10 @@ The regression model correctly predicts all uhi values when rounded to the neare
 
 lm_final_fit |>
   extract_fit_parsnip() |>
-  vip(num_features = 20) %>%
-  .$data |>
-  mutate(
-    Importance = Importance / max(Importance),
-    Variable = fct_reorder(.x = Importance, .f = Variable)
-  ) |>
-  ggplot(aes(Importance, Variable)) +
-  geom_col() +
-  theme_void() +
-  labs(
-    title = "Top Predictors in Linear Regression Model")
+  vip(num_features = 20) +
+  labs(title = "Top Predictors in Linear Regression Model") +
+  ylab("Importance") +
+  xlab("Variable")
 
 ```
 
