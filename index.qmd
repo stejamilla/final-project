@@ -57,16 +57,16 @@ options(scipen = 999)
 
 ```
 
-# Loading and Cleaning the Data
+# Prepare the Data (Loading and Cleaning)
 
 ## DC Land Cover Data
 
-Loading data from Open Data DC (landcover, ward geometry):
+Load data from Open Data DC (landcover, ward geometry):
 
 ```{r}
 #| label: "Tree Canopy & ward data"
 
-# Loading Urban Tree Canopy by Census Block Group (2020) data
+# Load Urban Tree Canopy by Census Block Group (2020) data
 landcover <- read_sf(paste0("data/Urban_Tree_Canopy",
                             "_by_Census_Block_Group_in_2020.shp")) |>
   rename(block_group = GEOID) |>
@@ -77,7 +77,7 @@ landcover <- read_sf(paste0("data/Urban_Tree_Canopy",
   # Converting UHI to Fahrenheit
   mutate(uhi = (uhi*(9/5) + 32))
 
-# Loading DC Ward data from Urban Tree Canopy by Ward (2020)
+# Load DC Ward data from Urban Tree Canopy by Ward (2020)
 wards <- read_sf("data/Urban_Tree_Canopy_by_Ward_in_2020.shp") |>
   rename_all(tolower) |>
   select(ward) |>
@@ -85,25 +85,7 @@ wards <- read_sf("data/Urban_Tree_Canopy_by_Ward_in_2020.shp") |>
 
 ```
 
-Create key with Urban Tree Canopy data column descriptions and clean up:
-
-STEPHANIE 12/16 - Unsure if we need to show that we created this landcover_key because it was just for our reference, not necessarily part of our analysis.
-
-```{r}
-#| label: "Landcover key"
-
-landcover_key <- read_csv("data/Urban_Tree_Canopy_Descriptions.csv",
-                          col_names = FALSE) |>
-  mutate(X1 = str_remove_all(X1, "\\( type:.*alias:|, length:.*| \\)")) |>
-  separate(col = X1,
-           into = c("field", "description"),
-           sep = " ",
-           extra = "merge") |>
-  mutate(field = tolower(field))
-
-```
-
-Categorizing each block group into their respective ward:
+Categorize each block group by ward:
 
 ```{r}
 #| label: "Spatial join landcover and wards"
@@ -112,20 +94,21 @@ Categorizing each block group into their respective ward:
 # area of a block group within a ward
 landcover <- st_join(landcover, wards, largest = TRUE)
 
-# Mapping the overlapping wards & block groups
+# Map the overlapping wards & block groups
 landcover |>
   mutate(ward = as.character(ward)) |>
   ggplot() +
   geom_sf(aes(fill = ward)) +
   theme_void() +
-  labs(title = "Map of DC",
-       subtitle = "by Census Block Group & Ward",
+  labs(title = "District of Columbia Census Block Groups, by Ward",
+       subtitle = "2020",
+       caption = paste0("Source: Census American Community Survey, 2016 - 2022",
+                        "\nUrban Tree Canopy by Census Block Group, 2020"),
        fill = "Ward") 
 
 ```
 
-STEPHANIE 12/13 - this code says that if a ward intersects with a blockgroup, then classify that block group as a ward.
-For block groups that overlap multiple wards, it returns the ward that the block group overlaps with the most area (that's the argument largest = TRUE)
+If a ward intersected a block group, we classified that block group as a ward. If a block group overlapped multiple wards, we selected the ward that contained the largest portion of the block group's area to serve as that block group's ward for the study.
 
 ## Census Demographic Data
 
@@ -148,7 +131,7 @@ We can do something like "step_dummy()" if we want to recode a categorical varia
 
 STEPHANIE 12/16 - I also don't know if we need to show this code block - we used it to look through various variables but we could probably cut this and instead explain in words why we chose the variables we did.
 
-### Loading Census demographic data via API
+### Load Census Demographic Data via API
 
 ```{r}
 #| label: "Load ACS data"
@@ -242,10 +225,10 @@ names(acs_data) <- acs_matrix[1, ] |>
 
 ```
 
-Labeling and cleaning ACS variables:
+Label and clean ACS variables:
 
 ```{r}
-#| label: "Cleaning ACS data"
+#| label: "Clean ACS data"
 
 # Clean up ACS data
 acs_data <- acs_data |>
@@ -289,7 +272,7 @@ acs_data <- acs_data |>
 
 
 # Convert rent burden variables into a percentage of rent burdened households,
-# then dropping original rent burden variables
+# then drop original rent burden variables
 acs_data <- acs_data |> 
   mutate(
     rent_burden_sum = 
@@ -381,33 +364,33 @@ acs_data <- acs_data |>
 
 ```
 
-# Creating the Final Dataset for Analysis
+# Create the Final Dataset for Analysis
 
-## Deciding threshold for hotspot vs. not hotspot
+## Determine Threshold for Hotspot vs. Not Hotspot
 
-Deciding the threshold for hot vs. not hot:
+Decide the threshold for hot vs. not hot:
 
 ```{r}
 
-# Visualizing a cumulative histogram of counts of UHI values
+# Visualize a cumulative histogram of counts of UHI values
 landcover |>
   group_by(uhi) |>
   ggplot(aes(uhi)) +
   geom_histogram(aes(y = cumsum(..count..)))
 
-# Calculating / visualizing frequency & cumulative frequency
+# Calculate / visualize frequency & cumulative frequency
 heat_freq <- landcover |>
   count(uhi)
 
 heat_freq$cumulative <- cumsum(heat_freq$n)
 
-# Calculating the standard deviation and the mean of uhi
+# Calculate the standard deviation and the mean of uhi
 heat_freq |> summarize(
   sd(uhi),
   mean(uhi)
 )
 
-# Calculating how many block groups have one standard deviation above the mean
+# Calculate how many block groups have one standard deviation above the mean
 heat_freq |>
   filter(uhi >= 91.6) |>
   count()
@@ -425,7 +408,7 @@ According to this source (https://data.cityoftacoma.org/datasets/tacoma::urban-h
 MADELEINE 12/14: I split up the join from the metrics because the ward-level imputation has to happen in between (after join, before metrics).
 
 ```{r}
-#| label: "Stitching the datasets together"
+#| label: "Stitch the datasets together"
 
 dc_full_data <- left_join(landcover, acs_data, by = "block_group") 
 
@@ -469,7 +452,7 @@ dc_full_data <- dc_full_data |>
 
 ```
 
-## Finalizing full dataset
+## Finalize the Full Dataset
 
 ```{r}
 #| label: "Create metrics"
@@ -567,7 +550,7 @@ dc_full_data <- dc_full_data|>
 
 ```
 
-## Evaluating imputation via visualization
+## Evaluate Imputation Via Visualization
 
 Missing data have been imputed using the next smallest geography available.
 In order to assess the accuracy of these imputations, we plot the variables with imputed values against another variable with no imputed values, one which should have some correlation or general relation with the partially imputed variable.
@@ -578,7 +561,7 @@ Either way, I think we should split up the below code chunks for each visualizat
 I've also modeled a cleaned version of the evaluation data visualization for the code in the chunk after "\# % rent burdened vs. POC ratio" which we can replicate for the visualizations we want to keep.
 
 ```{r}
-#| label: "Evaluating imputation for percent rent burdened variable"
+#| label: "Evaluate imputation for percent rent burdened variable"
 
 # It was harder finding variables that are clearly correlated with this than it 
 # was for some of the other partially-imputed variables. These are the most
@@ -614,7 +597,7 @@ dc_full_data |> ggplot() +
 ```
 
 ```{r}
-#| label: "Evaluating imputation for median household income"
+#| label: "Evaluate imputation for median household income"
 
 # Median household income vs. POC ratio
 dc_full_data |> ggplot() +
@@ -650,7 +633,7 @@ dc_full_data |> ggplot() +
 ```
 
 ```{r}
-#| label: "Evaluating imputation for median property value"
+#| label: "Evaluate imputation for median property value"
 
 # Median property value vs. POC ratio
 dc_full_data |> ggplot() +
@@ -688,7 +671,7 @@ dc_full_data <- dc_full_data |>
 
 ```
 
-## Prepare the data for analysis (set seed & splitting)
+## Prepare the Data for Analysis (Seed Setting & Splitting)
 
 ```{r}
 #| label: "Split into training and testing"
@@ -703,9 +686,9 @@ dc_test <- testing(x = dc_split)
 
 ```
 
-# Exploratory Data Analysis
+# Conduct Exploratory Data Analysis
 
-## Review summary statistics
+## Review Summary Statistics
 
 ```{r}
 #| label: "Create summary stats table"
@@ -758,7 +741,7 @@ dc_train |>
 
 ```
 
-## Exploring temperature in relation to other variables
+## Explore Temperature in Relation to Other Variables
 
 JAME 12/12 - I fixed this - I guess we have to left_join with the sf df in the first position in left_join(), so that we join the non-sf df onto the sf df and it stays sf.
 BUT do we have to st_transform() since the crs is not 4326?
@@ -902,16 +885,6 @@ utc_eda + imp_eda
 Meanwhile, landcover variables show a potentially strong relationship with UHI. Generally, it seems that as urban tree canopy area increases, UHI decreases. Conversely, as the percent area of impervious surfaces (e.g., roads, parking lots, etc.) increases, UHI also increases. This may indicate that landcover variables may hold more importance in our models compared to demographic ones.
 
 # Preparation for Modeling
-
-STEPHANIE 12/13 - I added "-tract" and "-ward" to remove more geographic indicators that likely would affect the model, since that otherwise would've been a main predictor of a hotspot
-
-JAMIE 12/12 - Do we want folds?
-added here.
-Not using folds does not make the lm rank deficient model warning go away.
-STEPHANIE 12/13 - I think yes, we'll have to use it, especially for hyper parameter tuning.
-My main issue with folding at this point is that I think we need to remove all the variables we don't want from dc_train first and then get do folding so that the folding process doesn't take them into account.
-So I think we should take out the variables from dc_train before the lm and rf models (using select rather than step_rm) and then do the folding.
-JAMIE 12/13 - Relocated these steps per discussion.
 
 MADELEINE 12/14 - should hotspot be kept in here?
 there is a comment saying "remove duplicative hotspot", but then the next code chunk seems to need it
@@ -1102,11 +1075,11 @@ canopy_map + planting_map + impervious_map + housing_map
 
 ```
 
-## Evaluating the Model
+## Evaluate the Model
 
 STEPHANIE 12/15 - Adding this evaluation in since we need to assess the decision tree model on its own (can't really compare it to rf and lm since they have different outcome variables).
 
-### Creating predictions
+### Predict on the Testing Data
 
 ```{r}
 #| label: "Creating predictions"
@@ -1186,7 +1159,7 @@ dt_predictions |>
 
 ```
 
-### Creating confusion matrix
+### Create the Confusion Matrix
 
 ```{r}
 #| label: "Confusion matrix"
@@ -1201,7 +1174,7 @@ conf_mat(data = dt_predictions,
 
 ```
 
-Calculating accuracy, precision, and recall/sensitivity:
+Calculate accuracy, precision, and recall/sensitivity:
 
 ```{r}
 #| label: "Calculating accuracy, precision, recall"
@@ -1228,7 +1201,9 @@ Another idea may be to examine the predictors used and adjust which ones should 
 For example, we made an assumption that using percentage area of the landcover variables rather than the total area variables (e.g., we chose percentage of area covered by canopy rather than total area covered by canopy) to allow consistency across block groups who vary in total area size.
 Perhaps it would be worth investigating the performance of this model using the total area variables instead or even alongside the percentage variables.
 
-# Linear Regression
+# Linear Regression and Random Forest Models
+
+## Create a Recipe for the Regression and Random Forest Models
 
 ```{r}
 #| label: "Recipe for LM and RF models"
@@ -1244,6 +1219,8 @@ dc_recipe <- recipe(formula = uhi ~ ., data = dc_train) |>
   step_corr(all_predictors())
 
 ```
+
+# Linear Regression
 
 ## Modelling
 
@@ -1358,19 +1335,14 @@ rf_resamples <- dc_rf_workflow |>
 
 ```
 
-# Comparing Models
+# Compare the Linear Regression and Random Forest Models
 
 ## Plot the RMSEs across each fit:
-
-JAMIE 12/12 - Below is what I used in the assignment 07 hw to pull the metrics in the end, so pasted here and updated a bit.
-It renders!
-
-STEPHANIE 12/15 - I edited the code to be a bit more simple (also based on what I submitted for assignment 07)
 
 ```{r}
 #| label: "RMSE for each resample of each model"
 
-# Linear Regression: Calculating and plotting the RMSE for each resample
+# Linear Regression: Calculate and plot the RMSE for each resample
 collect_metrics(
   dc_lm_resamples, 
   summarize = FALSE) |>
@@ -1380,7 +1352,7 @@ collect_metrics(
   geom_point() +
   geom_line()
 
-# Random Forests: Calculating and plotting the RMSE for each resample
+# Random Forests: Calculate and plot the RMSE for each resample
 rf_resamples |>
   collect_metrics(summarize = FALSE) |>
   filter(.metric == "rmse") |>
@@ -1390,7 +1362,7 @@ rf_resamples |>
   geom_line()
 
 
-# Comparing average rmse
+# Compare average rmse
 bind_rows(
   "Linear regression" = collect_metrics(dc_lm_resamples) |>
     filter(.metric == "rmse"), 
@@ -1408,37 +1380,37 @@ STEPHANIE 12/15 - Based on this, it seems that linear regression is the better m
 ```{r}
 #| label: "Implement final model"
 
-# Selecting the best resamples via select_best
+# Select the best resamples via select_best
 lm_best <- dc_lm_resamples |>
   select_best(metric = "rmse")
 
-# Finalizing the workflow with finalize_workflow
+# Finalize the workflow with finalize_workflow
 lm_final <- finalize_workflow(
   dc_lm_workflow,
   parameters = lm_best
 )
 
-# Fitting the model on all the data
+# Fit the model on all the data
 lm_final_fit <- 
   lm_final |>
   last_fit(dc_split) 
 
-# Collecting metrics for RMSE
+# Collect metrics for RMSE
 lm_final_fit |>
   collect_metrics() |>
   filter(.metric == "rmse")
 
-# making predictions with the testing data
+# Make predictions with the testing data
 lm_predictions <- bind_cols(
   dc_test,
   predict(object = extract_workflow(lm_final_fit), 
           new_data = dc_test) 
 )
 
-# Displaying the first 10 predictions against the actual values
+# Display the first 10 predictions against the actual values
 select(lm_predictions, uhi, starts_with(".pred"))
 
-# Interrogating which values were incorrectly predicted to the nearest tenth
+# Interrogate which values were incorrectly predicted to the nearest tenth
 lm_predictions |>
   select(uhi, .pred) |>
   mutate(.pred = round(lm_predictions$.pred, 1),
@@ -1453,7 +1425,7 @@ STEPHANIE 12/16 - I'm a bit bewildered how the regression model correctly predic
 When you round to the nearest hundreth, it still gets 109 of 116 correct.
 But then by the thousandth it goes to only 73 correct.
 
-## Visualizing the most important predictors
+## Visualize the Most Important Predictors
 
 ```{r}
 #| label: "Visualize most important predictors"
