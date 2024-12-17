@@ -365,9 +365,9 @@ landcover |>
   ggplot(aes(uhi)) +
   geom_histogram(aes(y = cumsum(..count..))) +
   labs(title = paste0("Distribution of Urban Heat Index (UHI) Variable",
-                      "\nDistrict of Columbia"),
+                      " District of Columbia"),
        subtitle = "2020",
-       caption = paste0("Source: DC Open Data Urban Tree Canopy by Census",
+       caption = paste0("\nSource: DC Open Data Urban Tree Canopy by Census",
                         "\nBlock Group, 2020, and Portland State University")) +
   xlab("Urban Heat Index (UHI)") +
   ylab("Frequency")
@@ -689,7 +689,7 @@ dc_train |>
   labs(title = paste0("Median Household Income Distribution in the District of",
                       " Columbia"),
        subtitle = "2020",
-       caption = "Source: Census American Community Survey, 2016 - 2020") +
+       caption = "\nSource: Census American Community Survey, 2016 - 2020") +
   xlab("Median Household Income") +
   ylab("Frequency") +
   scale_x_continuous(labels = scales::label_dollar())
@@ -733,26 +733,28 @@ total_pop_eda <- dc_train |>
   theme_minimal() +
   labs(title = "UHI and Total Population",
        subtitle = "By Block Group",
-       caption = paste0("Source: Census American Community Survey, 2016 - 2020",
-                        "\nDC Open Data Urban Tree Canopy by Census Block",
-                        " Group, 2020, and Portland State University"),
+       caption = paste0("Source: Census American\nCommunity Survey, 2016-2020;",
+                        "\nDC Open Data Urban Tree\nCanopy by Census Block",
+                        "\nGroup, 2020, and\nPortland State University"),
        color = "Hotspot") +
-  xlab("Total Population") +
-  ylab("UHI")
+  xlab("\nTotal Population") +
+  ylab("UHI") +
+  scale_x_continuous(labels = scales::label_comma())
 
 # Population density
 pop_density_eda <- dc_train |>
   ggplot(aes(x = pop_dens_sq_mi, y = uhi, color = hotspot)) +
   geom_point(alpha = 0.5) +
   theme_minimal() +
-  labs(title = "UHI and population density",
-       subtitle = "by Block Group",
-       caption = paste0("Source: Census American Community Survey, 2016 - 2020",
-                        "\nDC Open Data Urban Tree Canopy by Census Block",
-                        " Group, 2020, and Portland State University"),
+  labs(title = "UHI and Population Density",
+       subtitle = "By Block Group",
+       caption = paste0("Source: Census American\nCommunity Survey, 2016-2020;",
+                        "\nDC Open Data Urban Tree\nCanopy by Census Block",
+                        "\nGroup, 2020, and\nPortland State University"),
        color = "Hotspot") +
-  xlab("Population per Square Mile") +
-  ylab("UHI")
+  xlab("\nPopulation per Square Mile") +
+  ylab("UHI") +
+  scale_x_continuous(labels = scales::label_comma())
 
 
 # Non-white population density
@@ -760,13 +762,13 @@ poc_pop_eda <- dc_train |>
   ggplot(aes(x = race_poc_ratio, y = uhi, color = hotspot)) +
   geom_point(alpha = 0.5) +
   theme_minimal() +
-    labs(title = "UHI and non-white population density",
-       subtitle = "by Block Group",
-       caption = paste0("Source: Census American Community Survey, 2016 - 2020",
-                        "\nDC Open Data Urban Tree Canopy by Census Block",
-                        " Group, 2020, and Portland State University"),
+    labs(title = "UHI and Non-White\nPopulation Density",
+       subtitle = "By Block Group",
+       caption = paste0("Source: Census American\nCommunity Survey, 2016-2020;",
+                        "\nDC Open Data Urban Tree\nCanopy by Census Block",
+                        "\nGroup, 2020, and\nPortland State University"),
        color = "Hotspot") +
-  xlab("Non-white Population Proportion") +
+  xlab("\nNon-White Population Proportion") +
   ylab("UHI")
 
 total_pop_eda + pop_density_eda + poc_pop_eda 
@@ -775,7 +777,7 @@ total_pop_eda + pop_density_eda + poc_pop_eda
 Population variables do not indicate a strong relationship with UHI/temperature.
 
 Temperature & income/education:
-```{r}
+```{r fig.width = 10}
 #| label: "Mapping temperature (UHI) against income and education"
 
 # Median household income
@@ -783,28 +785,30 @@ mhi_eda <- dc_train |>
   ggplot(aes(x = med_hhi, y = uhi, color = hotspot)) +
   geom_point(alpha = 0.5) +
   theme_minimal() +
-  labs(title = "UHI and median household income",
-       subtitle = "by Block Group",
-       caption = paste0("Source: Census American Community Survey, 2016 - 2020",
-                        "\nDC Open Data Urban Tree Canopy by Census Block",
-                        " Group, 2020, and Portland State University"),
+  labs(title = "UHI and Median Household Income",
+       subtitle = "By Block Group",
+       caption = paste0("Source: Census American\nCommunity Survey, 2016-2020;",
+                        "\nDC Open Data Urban Tree\nCanopy by Census Block",
+                        "\nGroup, 2020, and\nPortland State University"),
        color = "Hotspot") +
   xlab("Household Income") +
-  ylab("UHI")
+  ylab("UHI") +
+  scale_x_continuous(labels = scales::label_comma())
 
 # Ratio of bachelors degrees
 bach_eda <- dc_train |>
   ggplot(aes(x = ed_bach_ratio, y = uhi, color = hotspot)) +
   geom_point(alpha = 0.5) +
   theme_minimal() +
-    labs(title = "UHI and college degree attainment",
-       subtitle = "by Block Group",
-       caption = paste0("Source: Census American Community Survey, 2016 - 2020",
-                        "\nDC Open Data Urban Tree Canopy by Census Block",
-                        " Group, 2020, and Portland State University"),
+    labs(title = "UHI and College Degree Attainment",
+       subtitle = "By Block Group",
+       caption = paste0("Source: Census American\nCommunity Survey, 2016-2020;",
+                        "\nDC Open Data Urban Tree\nCanopy by Census Block",
+                        "\nGroup, 2020, and\nPortland State University"),
        color = "Hotspot") +
   xlab("Proportion of population with a bachelor's degree") +
-  ylab("UHI")
+  ylab("UHI") +
+  scale_x_continuous(labels = scales::label_comma())
 
 mhi_eda + bach_eda
 
@@ -812,7 +816,7 @@ mhi_eda + bach_eda
 Similarly, variables indicating economic status and educational attainment do not show strong relationship with UHI.
 
 Temperature & landcover:
-```{r}
+```{r fig.width = 10}
 #| label: "Mapping landcover variables"
 
 # Percentage area of urban tree canopy
@@ -820,12 +824,13 @@ utc_eda <- dc_train |>
   ggplot(aes(x = utc_pct, y = uhi, color = hotspot)) +
   geom_point(alpha = 0.5) +
   theme_minimal() +
-  labs(title = "UHI and urban tree canopy",
-       subtitle = "by Block Group",
-       caption = paste0("Source: DC Open Data Urban Tree Canopy by Census Block",
-                        " Group, 2020, and Portland State University"),
+  labs(title = "UHI and Urban Tree Canopy",
+       subtitle = "By Block Group",
+       caption = paste0("Source: Census American\nCommunity Survey, 2016-2020;",
+                        "\nDC Open Data Urban Tree\nCanopy by Census Block",
+                        "\nGroup, 2020, and\nPortland State University"),
        color = "Hotspot") +
-  xlab("% land area covered by urban tree canopy") +
+  xlab("% Land Area Covered By Urban Tree Canopy") +
   ylab("UHI")
   
 # Percentage area of impervious surfaces
@@ -833,12 +838,13 @@ imp_eda <- dc_train |>
   ggplot(aes(x = to_ia_pct, y = uhi, color = hotspot)) +
   geom_point(alpha = 0.5) +
   theme_minimal() +
-  labs(title = "UHI and impervious surfaces",
-       subtitle = "by Block Group",
-       caption = paste0("Source: DC Open Data Urban Tree Canopy by Census Block",
-                        " Group, 2020, and Portland State University"),
+  labs(title = "UHI and Impervious Surfaces",
+       subtitle = "By Block Group",
+       caption = paste0("Source: Census American\nCommunity Survey, 2016-2020;",
+                        "\nDC Open Data Urban Tree\nCanopy by Census Block",
+                        "\nGroup, 2020, and\nPortland State University"),
        color = "Hotspot") +
-  xlab("% land area covered by impervious surfaces") +
+  xlab("% Land Area Covered By Impervious Surfaces") +
   ylab("UHI")
 
 utc_eda + imp_eda
@@ -960,17 +966,12 @@ For reference, down-sampling "randomly subset all the classes in the training se
 
 ## Visualizing Important Variables
 
-STEPHANIE 12/13 - Using dc_full_data as the dataset since it's possible we may accidentally do data leakage when mapping dc_train because we'll notice which block groups were excluded.
-
-STEPHANIE 12/16 - I'm realizing I made a mistake, I visualized not the most important variables but the ones represented in the decision tree (which are actually different from the most important variables...I've put that code in mute below).
-I think both are valid but curious if we should plot the top most important variables instead of the variables in the decision tree nodes?
-
 ```{r fig.width = 9, fig.height = 8}
 #| label: "Mapping important variables"
 
-#dt_fitting |>
- # extract_fit_parsnip() |>
-  # vip(num_features = 10)
+dt_fitting |>
+  extract_fit_parsnip() |>
+   vip(num_features = 10)
 
 canopy_map <- dc_full_data |> ggplot() +
   geom_sf(aes(fill = utc_pct)) +
@@ -1033,8 +1034,6 @@ canopy_map + planting_map + impervious_map + housing_map
 ```
 
 ## Evaluate the Model
-
-STEPHANIE 12/15 - Adding this evaluation in since we need to assess the decision tree model on its own (can't really compare it to rf and lm since they have different outcome variables).
 
 ### Predict on the Testing Data
 
@@ -1116,7 +1115,9 @@ dt_predictions |>
 
 ```
 
-### Create the Confusion Matrix
+### Evaluate with Performance Metrics
+
+Create the Confusion Matrix
 
 ```{r}
 #| label: "Confusion matrix"
@@ -1150,13 +1151,8 @@ yardstick::recall(data = dt_predictions,
 
 ```
 
-Accuracy and recall are relatively high at 87.9% and 94.1%, respectively.
-This means that the model works relatively well in correctly classifying whether or not a block group is a hotspot and in specifically correctly identifying hotspots when that block group actually is a hotspost.
-Precision is not as high at 55.2%, since there were 13 instances in which the model predicted a block group is a hotspot when in reality it was not one.
-One possible way to improve the model is to adjust the threshold used to determine whether a block group is a hotspot or not.
-Another idea may be to examine the predictors used and adjust which ones should be included or not.
-For example, we made an assumption that using percentage area of the landcover variables rather than the total area variables (e.g., we chose percentage of area covered by canopy rather than total area covered by canopy) to allow consistency across block groups who vary in total area size.
-Perhaps it would be worth investigating the performance of this model using the total area variables instead or even alongside the percentage variables.
+Accuracy and recall are relatively high at 87.9% and 94.1%, respectively. This means that the model works relatively well in correctly classifying whether or not a block group is a hotspot and in specifically correctly identifying hotspots when that block group actually is a hotspost. Precision is not as high at 55.2%, since there were 13 instances in which the model predicted a block group is a hotspot when in reality it was not one. One possible way to improve the model is to adjust the threshold used to determine whether a block group is a hotspot or not. Another idea may be to examine the predictors used and adjust which ones should be included or not.
+For example, we made an assumption that using percentage area of the landcover variables rather than the total area variables (e.g., we chose percentage of area covered by canopy rather than total area covered by canopy) to allow consistency across block groups who vary in total area size. Perhaps it would be worth investigating the performance of this model using the total area variables instead or even alongside the percentage variables.
 
 # Linear Regression and Random Forest Models
 
@@ -1194,17 +1190,12 @@ dc_lm_workflow <-
   workflow() |>
   add_recipe(recipe = dc_recipe) |>
   add_model(spec = dc_lm_model)
-  
-unloadNamespace("Metrics")
 
 # Setting up resamples for later evaluation
 dc_lm_resamples <- dc_lm_workflow |>
   fit_resamples(resamples = dc_folds)
 
 ```
-
-STEPHANIE 12/15 - I took out fitting the model because we only really have to fit the best model between linear regression and random forests, since the purpose of fitting the model is to then create predictions from it, and we'd only want to create predictions based on the best model.
-Also, I'm not sure what we mean by line 1165 (unloadNamespace("Metrics")).
 
 # Random Forests
 
@@ -1258,9 +1249,6 @@ show_best(rf_resamples)
 ```
 
 Based on hyperparameter tuning, the best random forest model uses mtry = 15 and min_n = 11.
-
-STEPHANIE 12/15 - I took out the kable() argument from the line of code when we make dc_rf_grid becuase we don't really need to see the grid at that point; what matters is the last line of code when you show which hyperparameters are the best ones to use.
-It looks like mtry = 15 and min_n = 11 are the best options.
 
 ### Implementing best hyperparameters based on tuning
 
@@ -1329,7 +1317,7 @@ bind_rows(
 
 ```
 
-STEPHANIE 12/15 - Based on this, it seems that linear regression is the better model over random forests by a fairly large margin, which I find interesting since I think usually random forest models out perform other models like lm and regression trees?
+Based on this, it seems that linear regression is the better model over random forests by a fairly large margin, which I find interesting since I think usually random forest models out perform other models like lm and regression trees?
 
 # Implement the Final Model
 
@@ -1377,9 +1365,7 @@ lm_predictions |>
 
 ```
 
-STEPHANIE 12/16 - I'm a bit bewildered how the regression model correctly predicts ALL uhi values when rounded to the nearest tenth...is this possible?!
-When you round to the nearest hundreth, it still gets 109 of 116 correct.
-But then by the thousandth it goes to only 73 correct.
+The regression model correctly predicts all uhi values when rounded to the nearest tenth. When you round to the nearest hundreth, it still gets 109 of 116 correct. But then by the thousandth it goes to only 73 correct.
 
 ## Visualize the Most Important Predictors
 
@@ -1399,8 +1385,7 @@ lm_final_fit |>
 
 ```
 
-STEPHANIE 12/16 - Wow, it's kinda wild how it's really only seven variables of our 54 predictors that have large importance.
-I'm assuming that the other ones listed here are still somewhat important but maybe not enough for the bar to be visualized?
+Only seven variables of our 54 predictors that have large importance.
 
 STEPHANIE 12/13 - Then with the code chunk below, we should make some maps with the top \~3 variables as determined by the code chunk above
 
@@ -1412,9 +1397,7 @@ STEPHANIE 12/13 - Then with the code chunk below, we should make some maps with 
 
 # Practical Use of the Model
 
-STEPHANIE 12/16 - We should write about how DC should use this model.
-I assume something along the lines of being able to predict which block groups are at most risk of becoming a hotspot based on its characteristics and as they change year over year.
-We just need to be careful to not fall into a correlation/causation mindset and say something like "these block groups should plant more trees!" since that's incorrect - modelling here isn't like the regression we've done in Quant classes.
+We should write about how DC should use this model. I assume something along the lines of being able to predict which block groups are at most risk of becoming a hotspot based on its characteristics and as they change year over year. We just need to be careful to not fall into a correlation/causation mindset and say something like "these block groups should plant more trees!" since that's incorrect - modelling here isn't like the regression we've done in Quant classes.
 
 # Sources
 
