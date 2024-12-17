@@ -129,7 +129,6 @@ Load select Census ACS 5-yr 2016 - 2020 variables via API
 #| label: "Load ACS data"
 
 # Secure Census API key (from .env file) for use in Census API call
-load_dot_env()
 credential <- Sys.getenv("census_api_key")
 
 # Create url for API call
@@ -557,10 +556,6 @@ Missing data have been imputed using the next smallest geography available.
 In order to assess the accuracy of these imputations, we plot the variables with imputed values against another variable with no imputed values, one which should have some correlation or general relation with the partially imputed variable.
 We can then see if the imputed values follow the general trend of the correlation or not.
 
-STEPHANIE 12/16 - I'm torn between just choosing one visualization per imputated variable or keeping in all of these and then providing comments on each of them in the body of the Quarto doc (aka not using \# in the code chunks).
-Either way, I think we should split up the below code chunks for each visualization we keep in and then provide a bit of commentary after each one for interpretation of the graph.
-I've also modeled a cleaned version of the evaluation data visualization for the code in the chunk after "\# % rent burdened vs. POC ratio" which we can replicate for the visualizations we want to keep.
-
 **Rent Burden imputation evaluation**
 
 Compared to the other partially-imputed variables, it was harder to find variables that were clearly correlated with rent burden (the percentage of households in a given tract spending 30% or more of their income on rent). However, to the extent that trends could be seen in visualizations of the data, our imputed values seem to follow those trends.
@@ -578,7 +573,7 @@ dc_full_data |> ggplot() +
   ) +
   scale_color_manual(labels = c("No", "Yes"), values = c("#2271B5", "#8E133B")) +
   labs(title = "Evaluating Rent Burden Imputation",
-       subtitle = "Comparison with population with a Bachelor's degree",
+       subtitle = "Comparison with % population with a Bachelor's degree",
        color = "Imputed?") +
   xlab("Proportion of Population with a Bachelor's Degree") +
   ylab("Proportion of Households with Rent Burden") +
@@ -595,17 +590,23 @@ Rent burden vs. ward:
 dc_full_data |> ggplot() +
   geom_point(mapping =
     aes(x = ward, y = rent_burden_pct,
-        color = as.character(rb_imputed))
+        color = as.character(rb_imputed)),
+    alpha = 0.4
   ) +
-  labs(color = "imputed (0 = no, 1 = yes)")
-
+  scale_color_manual(labels = c("No", "Yes"), values = c("#2271B5", "#8E133B")) +
+  labs(title = "Evaluating Rent Burden Imputation",
+       subtitle = "Comparison with ward",
+       color = "Imputed?") +
+  xlab("Ward") +
+  ylab("Proportion of Households with Rent Burden") +
+  theme_minimal()
 ```
 
 No imputed values fall outside the range for their ward. (Since a few imputed values were imputed at the ward level, we would not want to rely on this alone - but it provides additional reassurance alongside other comparisons.)
 
 **Median household income imputation evaluation**
 
-Median household income vs. POC ratio:
+Median household income vs. people of color ratio:
 
 ```{r}
 #| label: "Evaluate imputation: med HHI vs. POC ratio"
@@ -613,13 +614,20 @@ Median household income vs. POC ratio:
 dc_full_data |> ggplot() +
   geom_point(mapping =
     aes(x = race_poc_ratio, y = med_hhi,
-        color = as.character(hhi_imputed))
+        color = as.character(hhi_imputed)),
+    alpha = 0.4
   ) +
-  labs(color = "imputed (0 = no, 1 = yes)")
+  scale_color_manual(labels = c("No", "Yes"), values = c("#2271B5", "#8E133B")) +
+  labs(title = "Evaluating Median Household Income Imputation",
+       subtitle = "Comparison with POC % of population",
+       color = "Imputed?") +
+  xlab("Proportion of Population POC") +
+  ylab("Median Household Income") +
+  theme_minimal()
 
 ```
 
-There is a clear negative correlation between median household income and POC ratio. The imputed data points seem to follow this trend. There is one datapoint where race_poc_ratio = 0 and imputed med_hhi looks to be somewhat too low - but this was a block group with zero reported population, so it's not surprising that household income would not be accurate here. Moreover, since it's only one data point, we are not too worried about systematic inaccuracy of the imputed values.
+There is a clear negative correlation between median household income and POC ratio. The imputed data points seem to follow this trend. There is one datapoint where race_poc_ratio = 0 and imputed med_hhi looks to be somewhat too low, but since it's only one data point, we are not too worried about systematic inaccuracy of the imputed values.
 
 Median household income vs. percent of population with a bachelor's degree:
 
@@ -629,10 +637,16 @@ Median household income vs. percent of population with a bachelor's degree:
 dc_full_data |> ggplot() +
   geom_point(mapping =
     aes(x = ed_bach_ratio, y = med_hhi,
-        color = as.character(hhi_imputed))
+        color = as.character(hhi_imputed)),
+    alpha = 0.4
   ) +
-  labs(color = "imputed (0 = no, 1 = yes)")
-
+  scale_color_manual(labels = c("No", "Yes"), values = c("#2271B5", "#8E133B")) +
+  labs(title = "Evaluating Median Household Income Imputation",
+       subtitle = "Comparison with % of population with a bachelor's degree",
+       color = "Imputed?") +
+  xlab("Proportion of Population with a Bachelor's Degree") +
+  ylab("Median Household Income") +
+  theme_minimal()
 ```
 
 There is less of a strong correlation here, but again, the imputed data points seem to fit the overall trend. There is an outlier in terms of ed_bach_ratio (= 1.00); arguably this should have had a larger value for med_hhi, but again, it is just one data point.
@@ -647,9 +661,16 @@ Median property value vs. POC ratio:
 dc_full_data |> ggplot() +
   geom_point(mapping =
     aes(x = race_poc_ratio, y = med_prop_val,
-        color = as.character(propval_imputed))
+        color = as.character(propval_imputed)),
+    alpha = 0.4
   ) +
-  labs(color = "imputed (0 = no, 1 = yes)")
+  scale_color_manual(labels = c("No", "Yes"), values = c("#2271B5", "#8E133B")) +
+  labs(title = "Evaluating Median Property Value Imputation",
+       subtitle = "Comparison with POC % of population",
+       color = "Imputed?") +
+  xlab("Proportion of Population POC") +
+  ylab("Median Property Value") +
+  theme_minimal()
 
 ```
 
@@ -664,9 +685,16 @@ Median property value vs. percent of population with a bachelor's degree:
 dc_full_data |> ggplot() +
   geom_point(mapping =
     aes(x = ed_bach_ratio, y = med_prop_val,
-        color = as.character(propval_imputed))
+        color = as.character(propval_imputed)),
+    alpha = 0.4
   ) +
-  labs(color = "imputed (0 = no, 1 = yes)")
+  scale_color_manual(labels = c("No", "Yes"), values = c("#2271B5", "#8E133B")) +
+  labs(title = "Evaluating Median Property Value Imputation",
+       subtitle = "Comparison with % of population with a bachelor's degree",
+       color = "Imputed?") +
+  xlab("Proportion of Population with a Bachelor's Degree") +
+  ylab("Median Property Value") +
+  theme_minimal()
 
 ```
 
@@ -974,21 +1002,13 @@ rpart.plot::rpart.plot(x = dt_fitting$fit$fit$fit,
 
 ```
 
-STEPHANIE 12/15 - Retaining comments for write-up in case we want to utilize them:
-
-Notes on results: I think we have an interesting model.
 The first decision point is whether the percentage of the block group that's covered by tree canopy; if it's greater or equal to 23% then it's not a hotspot.
 If it is less than 23%, then you check how suitable the block group is for tree planting "based on a weighted formula that includes all planting prioritization categories." If the score is less than 7, then it's a not hotspot.
 If it's greater than or equal to seven, you check the percent of total area that's covered by all combined impervious surfaces.
 If the percentage is less than 66%, then it's not a hotspot.
-If it's greater than or equal to 66%, then the final check is whether the number of housing units per person is less than 0.74.
-If it's greater than or equal to 0.75, then it's not a hotspot.
-If it is less than 0.74 then it is a hotspot.
-This last one is a bit odd because it's against what you think would happen...why would more housing units per person lead to cooler conditions?
-We could throw out some hypotheses here like since there are more housing units per person that means it's less densely occupied, so less heat?
+If it's greater than or equal to 66%, then the final check is whether the number of housing units per person is less than 0.74. If it's greater than or equal to 0.75, then it's not a hotspot. If it is less than 0.74 then it is a hotspot.
 
-Note on methods: STEPHANIE 12/13 - I've decided to keep in downsampling because I think it's useful.
-For reference, down-sampling "randomly subset all the classes in the training set so that their class frequencies match the least prevalent class. For example, suppose that 80% of the training set samples are the first class and the remaining 20% are in the second class. Down-sampling would randomly sample the first class to be the same size as the second class (so that only 40% of the total training set is used to fit the model)."
+Interestingly, the decision tree focuses on landcover variables. This is consistent with the EDA conducted that suggest that the temperature/uhi data have a notable relationship with landcover variables but not demographic variables. The last decision was a surprise because it initially seems counter-intuitive that more housing per person would lead to a block group not being a hotspot. Perhaps this is because more housing units per person mean that units are less densely occupied and therefore could contribute to cooler conditions.  
 
 ## Visualize Important Variables
 
@@ -1446,7 +1466,9 @@ In practice, before implementing the model, we would need to explore the definit
 
 # Practical Use of the Model
 
-We should write about how DC should use this model. I assume something along the lines of being able to predict which block groups are at most risk of becoming a hotspot based on its characteristics and as they change year over year. We just need to be careful to not fall into a correlation/causation mindset and say something like "these block groups should plant more trees!" since that's incorrect - modelling here isn't like the regression we've done in Quant classes.
+We envision that the DC government could leverage the decision tree and/or linear regression models over the years as demographics and land use changes over time. For example, if they have updated data for the predictors for some block groups, the government could run these models to see which block groups may be facing disproportionately high temperatures when Summer comes around. Thus, the government could priortize projects in these areas aimed at improving temperature cooling during hot months. The model could also be used by local nonprofit groups that also provide services to local communities, though these nonprofits should do so in partnership with DC government, who has more contextual information about the landcover variables. 
+
+If the DC government is interested in using or adapting this model, we do have some recommendations for future improvement. One would to use more recent temperature data before running the model on current/updated landcover variables; we would hope that the government may be able to access more viable remote sensing data. They should then also use more update Census demographic data as well. If the government may look to improve the models built, we would also recommend being more select with the landcover variables. The public metadata does not offer a lot of information about each variable, whereas the DC government likely has greater context about which variables may be duplicative and should be excluded.
 
 # Sources
 
