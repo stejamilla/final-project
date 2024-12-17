@@ -1446,7 +1446,7 @@ lm_final_fit |>
 
 ```
 
-Of the 54 predictors fed into each model, the linear regression model identified seven key landcover variables as the most important predictors of UHI:
+Interestingly, the model did not identify any Census American Community Survey variables as key predictors of UHI in the District of Columbia. From this result, we concluded that demographic variables are only related to UHI through their relationships to the landcover variables. Of the 54 predictors fed into each model, the linear regression model identified seven key landcover variables as the most important predictors of UHI:
 <br>
 * OVERALL: The overall suitability for tree planting score of a given block group.
 <br>
@@ -1462,6 +1462,7 @@ Of the 54 predictors fed into each model, the linear regression model identified
 <br>
 * TO_UN_PCT: The percentage of land area in the assessment boundary that is considered unsuitable for planting. This includes buildings and roads, barren soil and dry vegetation, as well as sports fields, golf course playing areas, airports, agricultural land, wetlands and any other land identified as unsuitable.
 <br><br>
+
 In practice, before implementing the model, we would need to explore the definitions of all landcover variables as well as their data collection context more closely with the District. Little information is available publicly on each variable beyond a set of [basic definitions](https://www.arcgis.com/sharing/rest/content/items/ccfacf902195465c8a823ca88f835ac2/info/metadata/metadata.xml?format=default&output=html). Further, many of these top variables seem to be plausibly related to each other, even though we included step_corr() in our recipe. This warrants further investigation of how step_corr() removes correlated variables and the relationships among the remaining variables.
 
 # Practical Use of the Model
