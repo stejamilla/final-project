@@ -13,14 +13,22 @@ execute:
   warning: false
 urlcolor: blue
 toc: true
+editor: 
+  markdown: 
+    wrap: sentence
 ---
 
 # About This Project
-Urban environments tend to retain heat due to having less tree/vegetation cover, more impervious surfaces such as asphalt, and other factors. Using data on DC's landcover, we built and tested three different models to predict where hotspots are most likely to occur within the District. We also included several variables from the American Community Survey (ACS) to test whether demographic characteristics could also be predictive of hotspots. Our analysis is at the block group level.
+
+Urban environments tend to retain heat due to having less tree/vegetation cover, more impervious surfaces such as asphalt, and other factors.Using data on DC's landcover, [(Urban Tree Canopy by Census Block Group in 2020)](https://opendata.dc.gov/datasets/DCGIS::urban-tree-canopy-by-census-block-group-in-2020/about) we built and tested three different models to predict where hotspots are most likely to occur within the District. We also included several variables from the American Community Survey (ACS) to test whether demographic characteristics could also be predictive of hotspots.
+Our analysis is at the block group level.
+
+The main outcome variable is the average evening temperature, which is part of the DC landcover dataset. This was created by the [Sustaining Urban Places Research Lab (SUPR)](https://climatecope.research.pdx.edu/) at Portland State University in 2018. While we attempted to create our own temperature data leveraging remote sensing raster data from satellites like MODIS, the publicly available data was at too large of a resolution to capture different temperatures in each block group like SUPR was able to accomplish. This data limitation combined with how the DC government--our intended primary end user of our models--has used this specific SUPR temperature variable within its own 2020 dataset, has led us to leverage this variable as the focus of our model. Notably, DC has chosen to use average evening temperatures (instead of morning or afternoon) in their landcover dataset. We believe this is because surface and air temperatures tend to be vastly different during the daytime but more similar at night--thus potentially accounting for a more consistent temperature experience. Additionally, built urban areas that have high concentration of impervious surfaces like roads and concrete cool much more slowly at night compared to non-built areas, thus heightening the temperature disparity and emphasizing the urban heat island effect of cities, which is what we are trying to model. 
 
 # Setup
 
 Loading packages:
+
 ```{r}
 #| label: "Packages"
 #| output: false
@@ -49,7 +57,6 @@ library(Metrics)
 options(scipen = 999)
 
 ```
-
 
 # Loading and Cleaning the Data
 
@@ -82,6 +89,7 @@ wards <- read_sf("data/Urban_Tree_Canopy_by_Ward_in_2020.shp") |>
 Create key with Urban Tree Canopy data column descriptions and clean up:
 
 STEPHANIE 12/16 - Unsure if we need to show that we created this landcover_key because it was just for our reference, not necessarily part of our analysis.
+
 ```{r}
 #| label: "Landcover key"
 
@@ -116,7 +124,9 @@ landcover |>
        fill = "Ward") 
 
 ```
-STEPHANIE 12/13 - this code says that if a ward intersects with a blockgroup, then classify that block group as a ward. For block groups that overlap multiple wards, it returns the ward that the block group overlaps with the most area (that's the argument largest = TRUE)
+
+STEPHANIE 12/13 - this code says that if a ward intersects with a blockgroup, then classify that block group as a ward.
+For block groups that overlap multiple wards, it returns the ward that the block group overlaps with the most area (that's the argument largest = TRUE)
 
 ## Census Demographic Data
 
@@ -130,10 +140,12 @@ acs_variables <- load_variables(2020, "acs5") |>
 
 ```
 
-MADELEINE PRE-12/12:
-* It occurs to me we may need to choose baseline categories for any categorical variables we include and leave those out? Not sure if that is only a requirement for line and linear regression?
-JAMIE 12/12 - Good point! I'm adding stuff in below without factoring that in for now, but I think we def need to determine if we need to deal with this!
-STEPHANIE 12/13 - I'm not too concerned about this because we've never had to address categorical variables in the assignments. We can do something like "step_dummy()" if we want to recode a categorical variable into a dummy instead.
+MADELEINE PRE-12/12: \* It occurs to me we may need to choose baseline categories for any categorical variables we include and leave those out?
+Not sure if that is only a requirement for line and linear regression?
+JAMIE 12/12 - Good point!
+I'm adding stuff in below without factoring that in for now, but I think we def need to determine if we need to deal with this!
+STEPHANIE 12/13 - I'm not too concerned about this because we've never had to address categorical variables in the assignments.
+We can do something like "step_dummy()" if we want to recode a categorical variable into a dummy instead.
 
 STEPHANIE 12/16 - I also don't know if we need to show this code block - we used it to look through various variables but we could probably cut this and instead explain in words why we chose the variables we did.
 
@@ -232,6 +244,7 @@ names(acs_data) <- acs_matrix[1, ] |>
 ```
 
 Labeling and cleaning ACS variables:
+
 ```{r}
 #| label: "Cleaning ACS data"
 
@@ -298,18 +311,24 @@ acs_data <- acs_data |>
          )
 ```
 
-When selecting which ACS variables to use, we wanted to include various characteristics of block groups. We chose to include total population and racial disaggregation of population to understand how the volume of population could affect temperature and if demographics of that population could be an important predictor. Levels of education are another way to understand the population in the block group, especially if people of similar levels of educational attainment live close to each other. Median household income and rent burden are economic indicators and consider how economic conditions could affect the conditions of a block group. Lastly, number of housing units, vacant units, occupied units, and median property value all economic characteristics of the block group (rather than the people), that may contribute to the physical environment of that block group.
+When selecting which ACS variables to use, we wanted to include various characteristics of block groups.
+We chose to include total population and racial disaggregation of population to understand how the volume of population could affect temperature and if demographics of that population could be an important predictor.
+Levels of education are another way to understand the population in the block group, especially if people of similar levels of educational attainment live close to each other.
+Median household income and rent burden are economic indicators and consider how economic conditions could affect the conditions of a block group.
+Lastly, number of housing units, vacant units, occupied units, and median property value all economic characteristics of the block group (rather than the people), that may contribute to the physical environment of that block group.
 
 ### Data Imputation Part 1
 
-The imputation logic works as follows:
-1) If data is missing at the block group level, the NA block group is assigned the mean value of the variable from neighboring block groups who share a census tract.
+The imputation logic works as follows: 1) If data is missing at the block group level, the NA block group is assigned the mean value of the variable from neighboring block groups who share a census tract.
 
-2) If data is still missing at the census tract level, use the mean for neighboring tracts in the corresponding ward. (This happens in the "Data Imputation Part 2" section below.)
+2)  If data is still missing at the census tract level, use the mean for neighboring tracts in the corresponding ward. (This happens in the "Data Imputation Part 2" section below.)
 
-We recognize that this method is imperfect. If, for example, if within a ward, we had to impute data for a couple block groups based on tract-level averages and then impute data for other block groups based on the ward-level average, then that means the ward-level average for a block group was created partially by other already-imputed values (using tract-level averages). However, there were only a small number of instances of these.* Another limitation is that median househould income and median property value variables are top- and bottom-coded, meaning that imputed values (based on averages) may be lower or higher than they should be due to the top/bottom coding. 
+We recognize that this method is imperfect.
+If, for example, if within a ward, we had to impute data for a couple block groups based on tract-level averages and then impute data for other block groups based on the ward-level average, then that means the ward-level average for a block group was created partially by other already-imputed values (using tract-level averages).
+However, there were only a small number of instances of these.\* Another limitation is that median househould income and median property value variables are top- and bottom-coded, meaning that imputed values (based on averages) may be lower or higher than they should be due to the top/bottom coding.
 
-*STEPHANIE 12/16 - Could someone check how many instances there were? I wrote the above based on Madeleine's notes.
+\*STEPHANIE 12/16 - Could someone check how many instances there were?
+I wrote the above based on Madeleine's notes.
 
 Imputation part 1: replace missing data points with tract-level data.
 
@@ -368,6 +387,7 @@ acs_data <- acs_data |>
 ## Deciding threshold for hotspot vs. not hotspot
 
 Deciding the threshold for hot vs. not hot:
+
 ```{r}
 
 # Visualizing a cumulative histogram of counts of UHI values
@@ -394,9 +414,14 @@ heat_freq |>
   count()
 
 ```
-The threshold for "hotspot" is having a uhi (average evening temperature) of 91.6 degrees Fahrenheit, which is one standard deviation (1.8 degrees) above the mean. This means that 82 of the 571 block groups (~14%) would be classified as a hotspot. We decided on this threshold with the belief that a hotspot should represent a blockgroup that meaningfully has an average higher temperature that the majority of the sample. Using standard deviation as a benchmark seemed to be an appropriate way to naturally divide the data.
 
-STEPHANIE 12/16 - I for the life of me cannot find more information about the methodology of when the Portland State University SUPR Lab collected the temperature data for DC. According to this source (https://data.cityoftacoma.org/datasets/tacoma::urban-heat-island-uhi-index-2018-portland-state-university/about), they collected the Portland data on 7/25/18, so I must assume that DC was around the same time, but I can't find something online that confirms this.
+The threshold for "hotspot" is having a uhi (average evening temperature) of 91.6 degrees Fahrenheit, which is one standard deviation (1.8 degrees) above the mean.
+This means that 82 of the 571 block groups (\~14%) would be classified as a hotspot.
+We decided on this threshold with the belief that a hotspot should represent a blockgroup that meaningfully has an average higher temperature that the majority of the sample.
+Using standard deviation as a benchmark seemed to be an appropriate way to naturally divide the data.
+
+STEPHANIE 12/16 - I for the life of me cannot find more information about the methodology of when the Portland State University SUPR Lab collected the temperature data for DC.
+According to this source (https://data.cityoftacoma.org/datasets/tacoma::urban-heat-island-uhi-index-2018-portland-state-university/about), they collected the Portland data on 7/25/18, so I must assume that DC was around the same time, but I can't find something online that confirms this.
 
 MADELEINE 12/14: I split up the join from the metrics because the ward-level imputation has to happen in between (after join, before metrics).
 
@@ -545,10 +570,13 @@ dc_full_data <- dc_full_data|>
 
 ## Evaluating imputation via visualization
 
-Missing data have been imputed using the next smallest geography available. In order to assess the accuracy of these imputations, we plot the variables with imputed values against another variable with no imputed values, one which should have some correlation or general relation with the partially imputed variable. We can then see if the imputed values follow the general trend of the correlation or not.
+Missing data have been imputed using the next smallest geography available.
+In order to assess the accuracy of these imputations, we plot the variables with imputed values against another variable with no imputed values, one which should have some correlation or general relation with the partially imputed variable.
+We can then see if the imputed values follow the general trend of the correlation or not.
 
-STEPHANIE 12/16 - I'm torn between just choosing one visualization per imputated variable or keeping in all of these and then providing comments on each of them in the body of the Quarto doc (aka not using # in the code chunks). Either way, I think we should split up the below code chunks for each visualization we keep in and then provide a bit of commentary after each one for interpretation of the graph.
-I've also modeled a cleaned version of the evaluation data visualization for the code in the chunk after "# % rent burdened vs. POC ratio" which we can replicate for the visualizations we want to keep.
+STEPHANIE 12/16 - I'm torn between just choosing one visualization per imputated variable or keeping in all of these and then providing comments on each of them in the body of the Quarto doc (aka not using \# in the code chunks).
+Either way, I think we should split up the below code chunks for each visualization we keep in and then provide a bit of commentary after each one for interpretation of the graph.
+I've also modeled a cleaned version of the evaluation data visualization for the code in the chunk after "\# % rent burdened vs. POC ratio" which we can replicate for the visualizations we want to keep.
 
 ```{r}
 #| label: "Evaluating imputation for percent rent burdened variable"
@@ -661,7 +689,6 @@ dc_full_data <- dc_full_data |>
 
 ```
 
-
 ## Prepare the data for analysis (set seed & splitting)
 
 ```{r}
@@ -681,8 +708,6 @@ dc_test <- testing(x = dc_split)
 
 ## Review summary statistics
 
-JAMIE 12/12 - Added summary stats table here
-
 ```{r}
 #| label: "Create summary stats table"
 
@@ -700,16 +725,20 @@ kable(dc_train_summary <- as_tibble(dc_train |>
 
 ```
 
+STEPHANIE 12/16 - Is there something meaningful we can say about the summary statistics?
+Otherwise unsure about
+
 ## Exploration of some of the continuous variables
 
 JAMIE 12/12 - when we run the below viz we have a warning message that 56 rows were removed.
 
-* I silenced the total ed attainment ggplot per by above note.
+-   I silenced the total ed attainment ggplot per by above note.
 
-STEPHANIE 12/13 - concerning the rows being removed, I think that's fine. I think that's happened with me for other visualizations before.
-* Concerning the ed attainment, I'm getting a thing that "educ_total" doesn't exist...so I'm not sure what's happening here
-JAMIE 12/13 - I removed the var that went into educ_total bc it's just the total line in the education table. So basically if we want to use a data viz here we need to use the categorical vars.
-
+STEPHANIE 12/13 - concerning the rows being removed, I think that's fine.
+I think that's happened with me for other visualizations before.
+\* Concerning the ed attainment, I'm getting a thing that "educ_total" doesn't exist...so I'm not sure what's happening here JAMIE 12/13 - I removed the var that went into educ_total bc it's just the total line in the education table.
+So basically if we want to use a data viz here we need to use the categorical vars.
+STEPHANIE 12/16 - I see, I think maybe we should just remove that one then?
 
 ```{r}
 #| label: "Exploring household income"
@@ -731,10 +760,12 @@ dc_train |>
 
 ## Exploring temperature in relation to other variables
 
-JAME 12/12 - I fixed this - I guess we have to left_join with the sf df in the first position in left_join(), so that we join the non-sf df onto the sf df and it stays sf. BUT do we have to st_transform() since the crs is not 4326?
+JAME 12/12 - I fixed this - I guess we have to left_join with the sf df in the first position in left_join(), so that we join the non-sf df onto the sf df and it stays sf.
+BUT do we have to st_transform() since the crs is not 4326?
 
-STEPHANIE 12/13 - It doesn't matter that the CRS isn't 4326 for mapping purposes - the main concern with CRS is that it has to be the same between two spatial datasets if you're going to do something like join the two. 
-I'm also realizing that we probably shouldn't do a map here with dc_train because this map shows which block groups are in the training data (vs. the testing data) since you can see which block groups are excluded from the map...so this may be a form of data leakage. I'm going to instead use the dc_full_data dataset.
+STEPHANIE 12/13 - It doesn't matter that the CRS isn't 4326 for mapping purposes - the main concern with CRS is that it has to be the same between two spatial datasets if you're going to do something like join the two.
+I'm also realizing that we probably shouldn't do a map here with dc_train because this map shows which block groups are in the training data (vs. the testing data) since you can see which block groups are excluded from the map...so this may be a form of data leakage.
+I'm going to instead use the dc_full_data dataset.
 
 ```{r}
 #| label: "Mapping temperature"
@@ -749,8 +780,9 @@ dc_full_data |> ggplot() +
     high = "#be2b25"
     ) +
   labs(
-    title = "Average evening temperature, 2018",
-    fill = "Temperature (degrees F)"
+    title = "Average evening temperature (2018)",
+    fill = "Fahrenheit",
+    caption = "Accessed via Open Data DC (2020) and created by Portland State University"
   ) +
   theme_void()
 
@@ -826,16 +858,23 @@ dc_train |>
 
 ```
 
-STEPHANIE 12/13 - The graphs that compare UHI with percentage area of urban tree canopy and of impervious surfaces seems quite compelling. This makes sense, and it's interesting to notice how not a lot of the demographic stuff doesn't seem to show up in EDA but the landcover stuff seem like promising predictors.
+STEPHANIE 12/13 - The graphs that compare UHI with percentage area of urban tree canopy and of impervious surfaces seems quite compelling.
+This makes sense, and it's interesting to notice how not a lot of the demographic stuff doesn't seem to show up in EDA but the landcover stuff seem like promising predictors.
 
 # Preparation for Modeling
+
 STEPHANIE 12/13 - I added "-tract" and "-ward" to remove more geographic indicators that likely would affect the model, since that otherwise would've been a main predictor of a hotspot
 
-JAMIE 12/12 - Do we want folds? added here. Not using folds does not make the lm rank deficient model warning go away.
-STEPHANIE 12/13 - I think yes, we'll have to use it, especially for hyper parameter tuning. My main issue with folding at this point is that I think we need to remove all the variables we don't want from dc_train first and then get do folding so that the folding process doesn't take them into account. So I think we should take out the variables from dc_train before the lm and rf models (using select rather than step_rm) and then do the folding.
+JAMIE 12/12 - Do we want folds?
+added here.
+Not using folds does not make the lm rank deficient model warning go away.
+STEPHANIE 12/13 - I think yes, we'll have to use it, especially for hyper parameter tuning.
+My main issue with folding at this point is that I think we need to remove all the variables we don't want from dc_train first and then get do folding so that the folding process doesn't take them into account.
+So I think we should take out the variables from dc_train before the lm and rf models (using select rather than step_rm) and then do the folding.
 JAMIE 12/13 - Relocated these steps per discussion.
 
-MADELEINE 12/14 - should hotspot be kept in here? there is a comment saying "remove duplicative hotspot", but then the next code chunk seems to need it
+MADELEINE 12/14 - should hotspot be kept in here?
+there is a comment saying "remove duplicative hotspot", but then the next code chunk seems to need it
 
 STEPHANIE 12/15 - that's a good point, Madeleine; we'll have to remove it for lm and rf but need to keep it in for decision tree
 
@@ -932,19 +971,29 @@ rpart.plot::rpart.plot(x = dt_fitting$fit$fit$fit,
                        roundint = FALSE)
 
 ```
+
 STEPHANIE 12/15 - Retaining comments for write-up in case we want to utilize them:
 
-Notes on results:
-I think we have an interesting model. The first decision point is whether the percentage of the block group that's covered by tree canopy; if it's greater or equal to 23% then it's not a hotspot. If it is less than 23%, then you check how suitable the block group is for tree planting "based on a weighted formula that includes all planting prioritization categories." If the score is less than 7, then it's a not hotspot. If it's greater than or equal to seven, you check the percent of total area that's covered by all combined impervious surfaces. If the percentage is less than 66%, then it's not a hotspot. If it's greater than or equal to 66%, then the final check is whether the number of housing units per person is less than 0.74. If it's greater than or equal to 0.75, then it's not a hotspot. If it is less than 0.74 then it is a hotspot. This last one is a bit odd because it's against what you think would happen...why would more housing units per person lead to cooler conditions? We could throw out some hypotheses here like since there are more housing units per person that means it's less densely occupied, so less heat?
+Notes on results: I think we have an interesting model.
+The first decision point is whether the percentage of the block group that's covered by tree canopy; if it's greater or equal to 23% then it's not a hotspot.
+If it is less than 23%, then you check how suitable the block group is for tree planting "based on a weighted formula that includes all planting prioritization categories." If the score is less than 7, then it's a not hotspot.
+If it's greater than or equal to seven, you check the percent of total area that's covered by all combined impervious surfaces.
+If the percentage is less than 66%, then it's not a hotspot.
+If it's greater than or equal to 66%, then the final check is whether the number of housing units per person is less than 0.74.
+If it's greater than or equal to 0.75, then it's not a hotspot.
+If it is less than 0.74 then it is a hotspot.
+This last one is a bit odd because it's against what you think would happen...why would more housing units per person lead to cooler conditions?
+We could throw out some hypotheses here like since there are more housing units per person that means it's less densely occupied, so less heat?
 
-Note on methods:
-STEPHANIE 12/13 - I've decided to keep in downsampling because I think it's useful. For reference, down-sampling "randomly subset all the classes in the training set so that their class frequencies match the least prevalent class. For example, suppose that 80% of the training set samples are the first class and the remaining 20% are in the second class. Down-sampling would randomly sample the first class to be the same size as the second class (so that only 40% of the total training set is used to fit the model)."
+Note on methods: STEPHANIE 12/13 - I've decided to keep in downsampling because I think it's useful.
+For reference, down-sampling "randomly subset all the classes in the training set so that their class frequencies match the least prevalent class. For example, suppose that 80% of the training set samples are the first class and the remaining 20% are in the second class. Down-sampling would randomly sample the first class to be the same size as the second class (so that only 40% of the total training set is used to fit the model)."
 
 ## Visualizing Important Variables
 
 STEPHANIE 12/13 - Using dc_full_data as the dataset since it's possible we may accidentally do data leakage when mapping dc_train because we'll notice which block groups were excluded.
 
-STEPHANIE 12/16 - I'm realizing I made a mistake, I visualized not the most important variables but the ones represented in the decision tree (which are actually different from the most important variables...I've put that code in mute below). I think both are valid but curious if we should plot the top most important variables instead of the variables in the decision tree nodes?
+STEPHANIE 12/16 - I'm realizing I made a mistake, I visualized not the most important variables but the ones represented in the decision tree (which are actually different from the most important variables...I've put that code in mute below).
+I think both are valid but curious if we should plot the top most important variables instead of the variables in the decision tree nodes?
 
 ```{r fig.width = 9, fig.height = 8}
 #| label: "Mapping important variables"
@@ -1098,6 +1147,7 @@ dt_predictions |>
 ```
 
 ### Creating confusion matrix
+
 ```{r}
 #| label: "Confusion matrix"
 
@@ -1112,6 +1162,7 @@ conf_mat(data = dt_predictions,
 ```
 
 Calculating accuracy, precision, and recall/sensitivity:
+
 ```{r}
 #| label: "Calculating accuracy, precision, recall"
 
@@ -1128,7 +1179,14 @@ yardstick::recall(data = dt_predictions,
      estimate = .pred_class)
 
 ```
-Accuracy and recall are relatively high at 87.9% and 94.1%, respectively. This means that the model works relatively well in correctly classifying whether or not a block group is a hotspot and in specifically correctly identifying hotspots when that block group actually is a hotspost. Precision is not as high at 55.2%, since there were 13 instances in which the model predicted a block group is a hotspot when in reality it was not one. One possible way to improve the model is to adjust the threshold used to determine whether a block group is a hotspot or not. Another idea may be to examine the predictors used and adjust which ones should be included or not. For example, we made an assumption that using percentage area of the landcover variables rather than the total area variables (e.g., we chose percentage of area covered by canopy rather than total area covered by canopy) to allow consistency across block groups who vary in total area size. Perhaps it would be worth investigating the performance of this model using the total area variables instead or even alongside the percentage variables.
+
+Accuracy and recall are relatively high at 87.9% and 94.1%, respectively.
+This means that the model works relatively well in correctly classifying whether or not a block group is a hotspot and in specifically correctly identifying hotspots when that block group actually is a hotspost.
+Precision is not as high at 55.2%, since there were 13 instances in which the model predicted a block group is a hotspot when in reality it was not one.
+One possible way to improve the model is to adjust the threshold used to determine whether a block group is a hotspot or not.
+Another idea may be to examine the predictors used and adjust which ones should be included or not.
+For example, we made an assumption that using percentage area of the landcover variables rather than the total area variables (e.g., we chose percentage of area covered by canopy rather than total area covered by canopy) to allow consistency across block groups who vary in total area size.
+Perhaps it would be worth investigating the performance of this model using the total area variables instead or even alongside the percentage variables.
 
 # Linear Regression
 
@@ -1177,7 +1235,7 @@ Also, I'm not sure what we mean by line 1165 (unloadNamespace("Metrics")).
 
 # Random Forests
 
-## Modelling 
+## Modelling
 
 ### Hyperparameter Tuning
 
@@ -1225,6 +1283,7 @@ rf_resamples <- tune_grid(
 show_best(rf_resamples)
 
 ```
+
 Based on hyperparameter tuning, the best random forest model uses mtry = 15 and min_n = 11.
 
 STEPHANIE 12/15 - I took out the kable() argument from the line of code when we make dc_rf_grid becuase we don't really need to see the grid at that point; what matters is the last line of code when you show which hyperparameters are the best ones to use.
@@ -1260,9 +1319,11 @@ rf_resamples <- dc_rf_workflow |>
 ```
 
 # Comparing Models
+
 ## Plot the RMSEs across each fit:
 
-JAMIE 12/12 - Below is what I used in the assignment 07 hw to pull the metrics in the end, so pasted here and updated a bit. It renders!
+JAMIE 12/12 - Below is what I used in the assignment 07 hw to pull the metrics in the end, so pasted here and updated a bit.
+It renders!
 
 STEPHANIE 12/15 - I edited the code to be a bit more simple (also based on what I submitted for assignment 07)
 
@@ -1347,9 +1408,13 @@ lm_predictions |>
   count(correct)
 
 ```
-STEPHANIE 12/16 - I'm a bit bewildered how the regression model correctly predicts ALL uhi values when rounded to the nearest tenth...is this possible?! When you round to the nearest hundreth, it still gets 109 of 116 correct. But then by the thousandth it goes to only 73 correct.
+
+STEPHANIE 12/16 - I'm a bit bewildered how the regression model correctly predicts ALL uhi values when rounded to the nearest tenth...is this possible?!
+When you round to the nearest hundreth, it still gets 109 of 116 correct.
+But then by the thousandth it goes to only 73 correct.
 
 ## Visualizing the most important predictors
+
 ```{r}
 #| label: "Visualize most important predictors"
 
@@ -1365,10 +1430,12 @@ lm_final_fit |>
   geom_col()
 
 ```
-STEPHANIE 12/16 - Wow, it's kinda wild how it's really only seven variables of our 54 predictors that have large importance. I'm assuming that the other ones listed here are still somewhat important but maybe not enough for the bar to be visualized?
 
+STEPHANIE 12/16 - Wow, it's kinda wild how it's really only seven variables of our 54 predictors that have large importance.
+I'm assuming that the other ones listed here are still somewhat important but maybe not enough for the bar to be visualized?
 
-STEPHANIE 12/13 - Then with the code chunk below, we should make some maps with the top ~3 variables as determined by the code chunk above
+STEPHANIE 12/13 - Then with the code chunk below, we should make some maps with the top \~3 variables as determined by the code chunk above
+
 ```{r}
 
 
@@ -1377,7 +1444,9 @@ STEPHANIE 12/13 - Then with the code chunk below, we should make some maps with 
 
 # Practical Use of the Model
 
-STEPHANIE 12/16 - We should write about how DC should use this model. I assume something along the lines of being able to predict which block groups are at most risk of becoming a hotspot based on its characteristics and as they change year over year. We just need to be careful to not fall into a correlation/causation mindset and say something like "these block groups should plant more trees!" since that's incorrect - modelling here isn't like the regression we've done in Quant classes.
+STEPHANIE 12/16 - We should write about how DC should use this model.
+I assume something along the lines of being able to predict which block groups are at most risk of becoming a hotspot based on its characteristics and as they change year over year.
+We just need to be careful to not fall into a correlation/causation mindset and say something like "these block groups should plant more trees!" since that's incorrect - modelling here isn't like the regression we've done in Quant classes.
 
 # Sources
 
@@ -1391,6 +1460,8 @@ https://www2.census.gov/programs-surveys/acs/tech_docs/accuracy/MultiyearACSAccu
 
 http://bit.ly/3DnlfIh
 
-https://climatecope.research.pdx.edu/ 
+https://climatecope.research.pdx.edu/
 
+https://globalfutures.asu.edu/azclimate/urban-heat-island/ 
 
+https://www.epa.gov/heatislands/what-are-heat-islands
