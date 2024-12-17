@@ -307,13 +307,9 @@ The imputation logic works as follows:
 
 2) If data is still missing at the census tract level, use the mean for neighboring tracts in the corresponding ward. (This happens in the "Data Imputation Part 2" section below.)
 
-We recognize that this method is imperfect. If, for example, if within a ward, we had to impute data for a couple block groups based on tract-level averages and then impute data for other block groups based on the ward-level average, then that means the ward-level average for a block group was created partially by 
+We recognize that this method is imperfect. If, for example, if within a ward, we had to impute data for a couple block groups based on tract-level averages and then impute data for other block groups based on the ward-level average, then that means the ward-level average for a block group was created partially by other already-imputed values (using tract-level averages). However, there were only a small number of instances of these.* Another limitation is that median househould income and median property value variables are top- and bottom-coded, meaning that imputed values (based on averages) may be lower or higher than they should be due to the top/bottom coding. 
 
-for two reasons:
-1) Imputed values at the census tract level feed into imputation at the ward level. For instance, say a ward is made up of 4 census tracts and each tract has 4 block groups. Initially, only 2/4 tracts have complete data. After imputing at the tract level, 3/4 are complete. When we go to impute the data for the final tract, that calculation will include the values we imputed for the other missing tract. I don't think this is that big of a deal, especially because the numbers of values that need to be imputed at the ward level is pretty small.
-
-2) Median household income and median property value are top- and bottom-coded (no one has an income less than $2,499 or greater than $250,000). The only way around this I can think of would be to choose one or more cutoffs as I did with the rent burden variable (for example, categorize income into "high income" and "low income"). I didn't do this because I wasn't sure what those cutoffs would be. I'm also not really sure how much it matters, since either way we can't capture the real high- and low-end incomes.
---
+*STEPHANIE 12/16 - Could someone check how many instances there were? I wrote the above based on Madeleine's notes.
 
 Imputation part 1: replace missing data points with tract-level data.
 
