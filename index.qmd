@@ -156,7 +156,7 @@ STEPHANIE 12/16 - I also don't know if we need to show this code block - we used
 
 
 # Secure Census API key (from .env file) for use in Census API call
-load_dot_env()
+
 credential <- Sys.getenv("census_api_key")
 
 # Create url for API call
@@ -736,7 +736,8 @@ JAMIE 12/12 - when we run the below viz we have a warning message that 56 rows w
 
 STEPHANIE 12/13 - concerning the rows being removed, I think that's fine.
 I think that's happened with me for other visualizations before.
-\* Concerning the ed attainment, I'm getting a thing that "educ_total" doesn't exist...so I'm not sure what's happening here JAMIE 12/13 - I removed the var that went into educ_total bc it's just the total line in the education table.
+* Concerning the ed attainment, I'm getting a thing that "educ_total" doesn't exist...so I'm not sure what's happening here 
+JAMIE 12/13 - I removed the var that went into educ_total bc it's just the total line in the education table.
 So basically if we want to use a data viz here we need to use the categorical vars.
 STEPHANIE 12/16 - I see, I think maybe we should just remove that one then?
 
@@ -776,8 +777,8 @@ dc_full_data |> ggplot() +
     color = "#400001"
     ) +
     scale_fill_gradient(
-    low = "#ffffff",
-    high = "#be2b25"
+    low = "#FCF4B3",
+    high = "#940000"
     ) +
   labs(
     title = "Average evening temperature (2018)",
@@ -787,36 +788,57 @@ dc_full_data |> ggplot() +
   theme_void()
 
 ```
+This map generally demonstrates the average evening temperature of block groups. Notably, Rock Creek Park is a particular area that is relatively cooler compared to the rest of the city. While it was difficult to find information on when exactly SUPR logged temperatures, we found the Tacoma, WA's version of this dataset on the city's [open data portal](https://data.cityoftacoma.org/datasets/tacoma::urban-heat-island-uhi-index-2018-portland-state-university/about), whose description claims that temperatures were from July 2018. Thus, we assume that DC temperatures were also taken that summer.
 
 Temperature & population:
-
-```{r}
-#| label: "Plotting temperature X population, pop density, non-white density"
+```{r fig.width = 10}
+#| label: "Plotting temperature (uhi) against population, pop density, non-white density"
 
 # Total population
-dc_train |>
+total_pop_eda <- dc_train |>
   ggplot(aes(x = total_pop, y = uhi, color = hotspot)) +
   geom_point(alpha = 0.5) +
-  theme_minimal()
+  theme_minimal() +
+  labs(title = "UHI and total population",
+       subtitle = "by Block Group",
+       caption = "Sources: ACS 2016-2020, DC Open Data",
+       color = "Hotspot") +
+  xlab("Total Population") +
+  ylab("UHI")
 
 # Population density
-dc_train |>
+pop_density_eda <- dc_train |>
   ggplot(aes(x = pop_dens_sq_mi, y = uhi, color = hotspot)) +
   geom_point(alpha = 0.5) +
-  theme_minimal()
+  theme_minimal() +
+  labs(title = "UHI and population density",
+       subtitle = "by Block Group",
+       caption = "Sources: ACS 2016-2020, DC Open Data",
+       color = "Hotspot") +
+  xlab("Population per Square Mile") +
+  ylab("UHI")
+
 
 # Non-white population density
-dc_train |>
+poc_pop_eda <- dc_train |>
   ggplot(aes(x = race_poc_ratio, y = uhi, color = hotspot)) +
   geom_point(alpha = 0.5) +
-  theme_minimal()
+  theme_minimal() +
+    labs(title = "UHI and non-white population density",
+       subtitle = "by Block Group",
+       caption = "Sources: ACS 2016-2020, DC Open Data",
+       color = "Hotspot") +
+  xlab("Non-white Population Proportion") +
+  ylab("UHI")
+
+total_pop_eda + pop_density_eda + poc_pop_eda 
 
 ```
+Population variables do not indicate a strong relationship with UHI/temperature.
 
 Temperature & income/education:
-
 ```{r}
-#| label: "Mapping temp X HHI, education"
+#| label: "Mapping temperature (UHI) against income and education"
 
 # Median household income
 dc_train |>
@@ -1465,3 +1487,5 @@ https://climatecope.research.pdx.edu/
 https://globalfutures.asu.edu/azclimate/urban-heat-island/ 
 
 https://www.epa.gov/heatislands/what-are-heat-islands
+
+https://data.cityoftacoma.org/datasets/tacoma::urban-heat-island-uhi-index-2018-portland-state-university/about
