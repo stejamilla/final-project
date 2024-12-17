@@ -1011,17 +1011,10 @@ If it's greater than or equal to 66%, then the final check is whether the number
 
 Interestingly, the decision tree focuses on landcover variables. This is consistent with the EDA conducted that suggest that the temperature/uhi data have a notable relationship with landcover variables but not demographic variables. The last decision was a surprise because it initially seems counter-intuitive that more housing per person would lead to a block group not being a hotspot. Perhaps this is because more housing units per person mean that units are less densely occupied and therefore could contribute to cooler conditions.  
 
-## Visualize Important Variables
+## Visualize Variables in the Decision Tree
 
 ```{r fig.width = 9, fig.height = 8}
-#| label: "Mapping important variables"
-
-dt_fitting |>
-  extract_fit_parsnip() |>
-  vip(num_features = 10) +
-  labs(title = "Top Predictors in Decision Tree Model") +
-  ylab("Importance") +
-  xlab("Variable")
+#| label: "Mapping decision tree variables"
 
 canopy_map <- dc_full_data |> ggplot() +
   geom_sf(aes(fill = utc_pct)) +
@@ -1297,7 +1290,7 @@ kable(show_best(rf_resamples))
 
 ```
 
-Based on hyperparameter tuning, the best random forest model uses mtry = 15 and min_n = 11. This means it has selected 15 predictors to be randomly sampled when splitting before each tree model and 11 minimum data points needed to do further splits.
+Based on hyperparameter tuning, the best random forest model uses mtry = 15 and min_n = 4. This means it has selected 15 predictors to be randomly sampled when splitting before each tree model and 4 minimum data points needed to do further splits.
 
 ### Implementing best hyperparameters based on tuning
 
@@ -1308,7 +1301,7 @@ Based on hyperparameter tuning, the best random forest model uses mtry = 15 and 
 dc_rf_model <- rand_forest(
   trees = 200,
   mtry = 15,
-  min_n = 11
+  min_n = 4
 ) |>
   set_mode(mode = "regression") |>
   set_engine(
